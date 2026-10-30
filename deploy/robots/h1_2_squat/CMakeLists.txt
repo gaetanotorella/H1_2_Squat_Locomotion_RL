@@ -8,8 +8,11 @@ set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+list(APPEND CMAKE_PREFIX_PATH "/opt/unitree_robotics/lib/cmake")
+find_package(unitree_sdk2 REQUIRED)
 find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(yaml-cpp REQUIRED)
+find_package(Eigen3 REQUIRED NO_MODULE)
 
 # onnxruntime e' vendorizzato in deploy/thirdparty/ come tarball prebuilt, e il tarball e' per
 # architettura: sul PC di sviluppo (x86_64) serve onnxruntime-linux-x64-1.22.0, sul PC di bordo
@@ -30,16 +33,13 @@ endif()
 message(STATUS "onnxruntime: ${ONNXRUNTIME_DIR}")
 
 include_directories(
-  /usr/include/eigen3
-  /usr/local/include/ddscxx # dds
-  /usr/local/include/iceoryx/v2.0.2 # dds
   include
   ${ONNXRUNTIME_DIR}/include
   ${PROJECT_SOURCE_DIR}/../../include/
 )
 
 link_libraries(
-  unitree_sdk2 ddsc ddscxx rt pthread # dds
+  unitree_sdk2 Eigen3::Eigen rt pthread
   libboost_program_options.a libyaml-cpp.a fmt
   ${ONNXRUNTIME_DIR}/lib/libonnxruntime.so
   stdc++fs   # std::filesystem su gcc 9 (Ubuntu 20.04); su gcc >= 11 e' uno stub innocuo
