@@ -1,0 +1,24 @@
+# Build outputs
+**/build/
+
+# Python
+__pycache__/
+*.egg-info/
+*.pyc
+
+# Training runs (checkpoints, TensorBoard events). The curated policies live in policies/.
+logs/
+outputs/
+
+# Logs written by the controller, the simulator and evaluation/
+sim_logs/
+
+# Dependencies downloaded by scripts/fetch_deps.sh
+third_party/
+
+# Docker build context prepared by deploy/docker/build.sh
+deploy/docker/_ctx/
+
+# Editors
+.vscode/
+.idea/
