@@ -17,15 +17,7 @@ FSM:
       1,1,1,1,1,1,1,
       1,1,1,1,1,1,1
     ]
-    # kd: [
-    #   5,5,6,5,5,6,
-    #   5,5,5,
-    #   5,
-    #   2,2,
-    #   2,2,2,2,
-    #   2,2,2,2, 
-    # ]
-    kd: [ # Passive damping raddoppiato (era 5,5,6,5,5,6, 5,5,5, 5, 2,2, 2,2,2,2, 2,2,2,2)
+    kd: [ # four times Unitree's default (legs 5-6, arms 2), so the robot sinks more slowly in Passive
       20,20,24,20,20,24,
       20,20,20,
       20,
@@ -64,4 +56,4 @@ FSM:
   Squat:
     transitions:
       Passive: LT + B.on_pressed
-    policy_dir: ../../../logs/rsl_rl/unitree_h1_2_squat
+    policy_dir: ../../../policies/h1_2_squat  # newest folder with exported/ inside

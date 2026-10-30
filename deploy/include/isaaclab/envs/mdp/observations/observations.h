@@ -112,34 +112,15 @@ REGISTER_OBSERVATION(last_action)
     return std::vector<float>(data.data(), data.data() + data.size());
 };
 
-// Fattore di scala del comando di velocita' in funzione della profondita' dello squat.
-// DEVE essere identico a UniformLevelVelocityCommand._update_command nel training: i due numeri
-// arrivano da deploy.yaml (generato dalla config di training), quindi la formula sta scritta una
-// volta sola e non puo' divergere. Se `speed_scale` manca -- policy addestrata prima di questa
-// modifica -- il fattore e' 1.0 e il comportamento e' quello di prima.
-//
-// Perche' (misurato in sim2sim, protocollo completo a tre quote):
-//     quota   vx avanti  vx indietro   vy     wz
-//     0.98      1.06        0.80      0.79   0.69
-//     0.78      0.82        0.69       --    0.58
-//     0.60      0.39        0.18      0.03   0.05
-// A fondo squat la locomozione non esiste: chiedergliela lo porta nella sua condizione meno
-// stabile di tutta la sessione (sway 0.057, roll -4.9 deg) senza che si muova.
-//
-// ROUND 7: la curva e' NON LINEARE (esponente esportato, 0.5 = radice). Con la rampa lineare a
-// 0.74 m il fattore valeva 0.364 e il comando laterale/indietro a fondo corsa scendeva a 0.109,
-// appena sopra la soglia 0.1 del clock del passo -- e sotto 0.713 m sempre sotto. Misurato a
-// 0.74 m: guadagno 0.79 in avanti contro 0.09 indietro, 0.13-0.23 laterale, 0.35-0.40 in
-// imbardata. Con esponente 0.5 il fattore a 0.74 diventa 0.60. Estremi invariati.
-//
-// ROUND 9: CUTOFF, non scaling. Lo scaling e' stato tolto dal training (riduceva per costruzione
-// la mobilita' a mezzo squat: vx avanti a 0.75 m da 0.94 a comando pieno a 0.33/0.52 scalato). Al
-// suo posto `cutoff_height`, esportato da export_deploy_cfg a partire da min_height_while_walking
-// del training: sotto quella quota la policy NON ha mai visto un comando di velocita' non nullo
-// (gli env che camminano non scendono sotto 0.70), quindi il controller lo azzera e il deploy resta
-// dentro la distribuzione di training. Sopra, comando pieno come in training. Vale per entrambi i
-// chiamanti (velocity_commands e gait_phase): con comando 0 il clock del passo resta congelato.
-// Se manca la chiave -- policy senza pavimento -- nessun cutoff.
+// Scale factor of the velocity command as a function of the squat height. It must match the
+// training (UniformLevelVelocityCommand._update_command): all its parameters come from deploy.yaml,
+// which is generated from the training configuration.
+//   - cutoff_height (final policy): below this height the command is zeroed. In training, walking
+//     environments never go below it, so the policy has never seen a velocity command there.
+//     Above it the command is passed unchanged, as in training. It applies to both callers
+//     (velocity_commands and gait_phase): with a zero command the gait clock stays frozen.
+//   - speed_scale (policies trained with depth scaling): scale = clamp((h - h0) / (h1 - h0))^exponent.
+// Without either key the factor is 1.0.
 inline float squat_speed_scale(isaaclab::ManagerBasedRLEnv * env)
 {
     const auto cmds = env->cfg["commands"]["base_velocity"];
@@ -158,12 +139,9 @@ inline float squat_speed_scale(isaaclab::ManagerBasedRLEnv * env)
     return (e == 1.0f) ? s : std::pow(s, e);
 }
 
-// Soglia "comando ~ zero" del clock del passo, proporzionale alla scala di profondita'.
-// DEVE combaciare con command_gate_threshold nel training: la soglia fissa a 0.1 era tarata sulla
-// stazione eretta e con lo scaling apriva una fascia (0.62-0.73 m) in cui il robot riceveva un
-// target di velocita' non nullo con il clock congelato. Il pavimento serve a NON annullare la
-// soglia a fondo squat, dove la scala e' 0: li' il comando e' identicamente 0 e il clock deve
-// restare congelato come prima.
+// "Command ~ zero" threshold of the gait clock, scaled with the speed scale; must match
+// command_gate_threshold in training. The floor keeps the threshold above zero at the deepest squat,
+// where the scale is 0: there the command is exactly 0 and the clock must stay frozen.
 inline float squat_gait_threshold(isaaclab::ManagerBasedRLEnv * env, float base_threshold)
 {
     const auto cmds = env->cfg["commands"]["base_velocity"];
@@ -207,17 +185,16 @@ REGISTER_OBSERVATION(gait_phase)
     obs[0] = std::sin(env->global_phase * 2 * M_PI);
     obs[1] = std::cos(env->global_phase * 2 * M_PI);
 
-    // Opzione C: congela il clock a (0,0) quando il comando joystick e' ~0 (soglia 0.1).
-    // IDENTICO al training (mdp.gait_phase con command_name="base_velocity"): il clock interno
-    // continua ad avanzare, ma l'output e' azzerato da fermo -> niente dondolio 1.25 Hz.
+    // Freeze the clock output at (0, 0) when the joystick command is ~0, as in training
+    // (mdp.gait_phase with command_name="base_velocity"): the internal clock keeps advancing, but
+    // the output is zero when standing, which removes the 1.25 Hz sway.
     auto & joystick = env->robot->data.joystick;
     const auto cmd_cfg = env->cfg["commands"]["base_velocity"]["ranges"];
     float vx = std::clamp(joystick->ly(), cmd_cfg["lin_vel_x"][0].as<float>(), cmd_cfg["lin_vel_x"][1].as<float>());
     float vy = std::clamp(-joystick->lx(), cmd_cfg["lin_vel_y"][0].as<float>(), cmd_cfg["lin_vel_y"][1].as<float>());
     float wz = std::clamp(-joystick->rx(), cmd_cfg["ang_vel_z"][0].as<float>(), cmd_cfg["ang_vel_z"][1].as<float>());
-    // La soglia va applicata al comando SCALATO, come nel training: mdp.gait_phase legge il comando
-    // dal command manager, che e' gia' scalato dalla profondita'. Usare qui quello grezzo terrebbe
-    // il clock in moto a fondo squat mentre in addestramento e' congelato -> disallineamento.
+    // The threshold applies to the SCALED command, as in training, where mdp.gait_phase reads the
+    // command from the command manager, already scaled.
     const float gait_scale = squat_speed_scale(env);
     vx *= gait_scale;
     vy *= gait_scale;
@@ -231,20 +208,18 @@ REGISTER_OBSERVATION(gait_phase)
 }
 
 // Squat task: target base height relative to nominal (target - nominal), matching the training
-// obs mdp.base_height_command_rel. Used ONLY by the squat controller (h1_2_ctrl_squat); harmless
-// for the velocity controller, whose deploy.yaml does not list it.
+// observation mdp.base_height_command_rel. The target is driven by the gamepad (see below).
 REGISTER_OBSERVATION(base_height_command)
 {
     const float nominal = params["nominal_height"].as<float>();
     const auto range = env->cfg["commands"]["base_height"]["ranges"]["height"];
-    const float h_min = range[0].as<float>();  // deepest squat (e.g. 0.55)
+    const float h_min = range[0].as<float>();  // deepest squat (0.60)
     const float h_max = range[1].as<float>();  // nominal / standing (e.g. 0.98)
 
-    // Fermo alla quota minima di camminata: R2 da solo si ferma 1 cm sopra cutoff_height (0.70 ->
-    // 0.71), A + R2 scende oltre fino a h_min. Il centimetro di margine c'e' perche' la rampa procede
-    // a 1 mm per passo in float: un fermo esattamente sul cutoff potrebbe lasciare il target a 0.6999
-    // e il cutoff azzererebbe i comandi di velocita' senza che si veda. Policy senza cutoff_height
-    // nel deploy.yaml -> nessun fermo (h_stop = h_min), comportamento di prima.
+    // Stop at the walking floor: R2 alone stops 1 cm above cutoff_height (0.70 -> 0.71), A + R2 goes
+    // further down to h_min. The 1 cm margin is there because the ramp moves 1 mm per step in float:
+    // a stop exactly on the cutoff could leave the target at 0.6999, and the cutoff would silently
+    // zero the velocity commands. Without cutoff_height in deploy.yaml there is no stop (h_stop = h_min).
     const auto vel_cmds = env->cfg["commands"]["base_velocity"];
     const bool has_cutoff = static_cast<bool>(vel_cmds["cutoff_height"]);
     const float cutoff = has_cutoff ? vel_cmds["cutoff_height"].as<float>() : h_min;
@@ -262,15 +237,15 @@ REGISTER_OBSERVATION(base_height_command)
         env->squat_target += rise_rate * env->step_dt;
     else if (joystick->RT.pressed)
     {
-        // Sotto il fermo R2 da solo non fa nulla (il limite non deve mai riportare il target in su):
-        // per scendere ancora serve A.
+        // Below the stop, R2 alone does nothing (the limit must never move the target up):
+        // going further down requires A.
         const float lower = joystick->A.pressed ? h_min : std::min(h_stop, prev);
         env->squat_target = std::max(prev - descend_rate * env->step_dt, lower);
     }
     env->squat_target = std::clamp(env->squat_target, h_min, h_max);
 
-    // Quota nel terminale, perche' durante il test non si vede altrimenti: gli eventi subito, durante
-    // la rampa al massimo ogni 0.25 s, e sempre il valore finale quando la rampa si ferma.
+    // Print the height to the terminal, since it cannot be seen otherwise during a test: events
+    // immediately, during a ramp at most every 0.25 s, and always the final value when it stops.
     const float h = env->squat_target;
     if (env->squat_print_cooldown > 0)
         env->squat_print_cooldown--;

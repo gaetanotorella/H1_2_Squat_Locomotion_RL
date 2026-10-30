@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 # =============================================================================
-# probe_dds.sh -- elenca i topic CycloneDDS del robot DAL PORTATILE.
+# probe_dds.sh -- lists the CycloneDDS applications and topics of the robot, from a laptop.
 #
-# Non serve installare niente a bordo: la discovery DDS e' peer-to-peer sulla
-# stessa sottorete, quindi basta essere collegati via ethernet. E' PASSIVO:
-# legge soltanto i topic builtin di discovery, non pubblica nulla.
+# Nothing to install on board: DDS discovery is peer-to-peer on the same subnet, so an ethernet
+# connection is enough. It is PASSIVE: it only reads the builtin discovery topics, it publishes
+# nothing. Requires the `cyclonedds` command line tool: pip install --user cyclonedds==0.10.2
 #
-# USO
-#   ./probe_dds.sh                 # interfaccia enp1s0, dominio 0
+# USAGE
+#   ./probe_dds.sh                 # interface enp1s0, domain 0
 #   ./probe_dds.sh enp1s0 0
-#   ./probe_dds.sh enp1s0 0 peers  # se il multicast non passa (vedi sotto)
+#   ./probe_dds.sh enp1s0 0 peers  # when multicast does not get through (see below)
 # =============================================================================
 set -u
 IFACE="${1:-enp1s0}"
@@ -18,7 +18,7 @@ MODE="${3:-multicast}"
 export PATH="$HOME/.local/bin:$PATH"
 
 if [ "$MODE" = "peers" ]; then
-  # fallback: discovery unicast verso indirizzi noti, se il multicast e' bloccato
+  # fallback: unicast discovery towards the known onboard addresses, when multicast is blocked
   export CYCLONEDDS_URI="<CycloneDDS><Domain id=\"any\"><General>\
 <Interfaces><NetworkInterface name=\"$IFACE\"/></Interfaces>\
 <AllowMulticast>false</AllowMulticast></General>\
@@ -31,21 +31,21 @@ else
 <Interfaces><NetworkInterface name=\"$IFACE\"/></Interfaces></General></Domain></CycloneDDS>"
 fi
 
-echo "interfaccia $IFACE | dominio $DOMAIN | discovery $MODE"
-ip -br addr show "$IFACE" 2>/dev/null || echo "  !! interfaccia $IFACE inesistente"
+echo "interface $IFACE | domain $DOMAIN | discovery $MODE"
+ip -br addr show "$IFACE" 2>/dev/null || echo "  !! interface $IFACE does not exist"
 echo
 
-echo "================ APPLICAZIONI DDS IN RETE ================"
+echo "================ DDS APPLICATIONS ON THE NETWORK ================"
 cyclonedds ps -i "$DOMAIN" -r 10s --suppress-progress-bar 2>&1
 
 echo
-echo "================ TOPIC (nome + tipo + QoS) ================"
+echo "================ TOPICS (name + type + QoS) ================"
 cyclonedds ls -i "$DOMAIN" -r 10s --suppress-progress-bar 2>&1
 
 echo
-echo "================ IDL RICOSTRUITO DEI TOPIC CHIAVE ================"
-# Serve a verificare che il TIPO combaci fra le due sponde: un mismatch di IDL
-# non produce alcun errore, semplicemente i dati non arrivano mai.
+echo "================ IDL OF THE KEY TOPICS ================"
+# Checks that the TYPE matches on both sides: an IDL mismatch produces no error, the data just
+# never arrives.
 for t in rt/lowstate rt/lowcmd rt/wirelesscontroller; do
   echo "--- $t ---"
   cyclonedds typeof "$t" -i "$DOMAIN" -r 5s --suppress-progress-bar 2>&1 | head -40

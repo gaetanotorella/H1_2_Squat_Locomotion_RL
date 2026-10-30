@@ -44,16 +44,17 @@ inline std::filesystem::path proj_dir;
 inline std::filesystem::path config_dir;
 inline YAML::Node config;
 
-// Interfaccia DDS scelta con --network. "lo" (o vuota) = sim2sim in loopback su questo PC;
-// qualunque altra interfaccia (eth0, enp3s0, ...) = test sul ROBOT REALE.
-// Serve al logger per decidere se creare una cartella exp_<ts> (robot reale, nessun simulatore
-// e nessun ground truth) oppure agganciare la sim_<ts> creata dal simulatore.
+// DDS interface chosen with --network: "lo" (or empty) is sim2sim on this PC, any other interface
+// (eth0, enp3s0, ...) is the real robot. The run logger uses it to name the log folder.
 inline std::string network_iface;
 
-// Cartella della policy effettivamente caricata, risolta da parser_policy_dir().
-// Serve alla tracciabilita': il logger la scrive in run_info.md dentro la cartella del run,
-// cosi' da ogni sim_log/exp_log si risale SEMPRE alla policy che l'ha prodotto.
+// Policy folder actually loaded (resolved by parser_policy_dir), written by the run logger to
+// run_info.md so that every log can be traced back to its policy.
 inline std::filesystem::path policy_dir;
+
+// CSV run log (isaaclab/envs/run_logger.h), enabled with --log. Default folder: <repo>/sim_logs.
+inline bool log_enabled = false;
+inline std::filesystem::path log_dir;
 
 inline std::filesystem::path get_bin_path() {
     std::vector<char> path(1024);
@@ -68,9 +69,8 @@ inline std::filesystem::path get_bin_path() {
 }
 
 /* ---------- config.yaml ---------- */
-// proj_dir / config_dir dipendono SOLO da dove sta il binario, mai dal file di config scelto:
-// `parser_policy_dir` risolve i percorsi relativi contro proj_dir, e un config di test messo
-// altrove non deve spostare quella radice.
+// proj_dir and config_dir depend only on where the binary is, never on the chosen config file:
+// parser_policy_dir resolves relative paths against proj_dir.
 inline void resolve_paths()
 {
     assert(std::filesystem::exists(bin_path)); // run param::helper before this function
@@ -86,12 +86,9 @@ inline void resolve_paths()
     }
 }
 
-// config_override vuoto -> config.yaml di produzione accanto al binario (comportamento storico,
-// invariato). Valorizzato (opzione --config) -> quel file e basta.
-//
-// PERCHE' ESISTE: la procedura di test automatizzata deve poter fissare la policy sotto test
-// senza riscrivere il config di produzione, che e' LO STESSO usato con --network <eth> sul robot
-// reale. Un test interrotto a meta' lasciava il robot reale puntato alla policy del test.
+// Empty config_override: the config.yaml next to the binary. Otherwise (--config) that file only.
+// The automated evaluation uses it to choose the policy under test without editing config.yaml,
+// which is the same file used on the real robot.
 inline void load_config_file(const std::string & config_override = "")
 {
     resolve_paths();
@@ -150,7 +147,7 @@ inline std::filesystem::path parser_policy_dir(std::filesystem::path policy_dir)
         }
     }
     spdlog::info("Policy directory: {}", policy_dir.string());
-    param::policy_dir = policy_dir;  // memorizzata per run_info.md (tracciabilita' dei log)
+    param::policy_dir = policy_dir;  // recorded in run_info.md by the run logger
     return policy_dir;
 }
 
@@ -167,18 +164,18 @@ inline po::variables_map helper(int argc, char** argv)
     desc.add_options()
         ("help,h", "produce help message")
         ("version,v", "show version")
-        ("log", "record log file")
+        ("log", "record log files: terminal output in log/log.txt and the CSV run log in --log-dir")
+        ("log-dir", po::value<std::string>()->default_value(""), "folder of the CSV run logs (default: <repo>/sim_logs)")
         ("network,n", po::value<std::string>()->default_value(""), "dds network interface")
         ("config,c", po::value<std::string>()->default_value(""),
-         "config.yaml alternativo (default: quello accanto al binario). Usato dalla procedura di "
-         "test automatizzata per non toccare il config di produzione.")
+         "alternative config.yaml (default: the one next to the binary)")
         ;
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
 
-    // il config si carica DOPO il parsing, per poter onorare --config
+    // the config is loaded after parsing, to honour --config
     load_config_file(vm["config"].as<std::string>());
 
     network_iface = vm["network"].as<std::string>();
@@ -203,6 +200,13 @@ inline po::variables_map helper(int argc, char** argv)
     {
         std::filesystem::create_directories(proj_dir / "log");
         spdlog::create_logger(proj_dir.string() + "/log/log.txt");
+
+        // CSV run log: proj_dir is deploy/robots/<robot>, so the repository root is three levels up
+        log_enabled = true;
+        const std::string dir = vm["log-dir"].as<std::string>();
+        log_dir = dir.empty() ? proj_dir.parent_path().parent_path().parent_path() / "sim_logs"
+                              : std::filesystem::absolute(dir);
+        spdlog::info("CSV run log in {}", log_dir.string());
     }
 
     return vm;

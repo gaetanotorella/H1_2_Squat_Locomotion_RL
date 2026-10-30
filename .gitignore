@@ -16,8 +16,8 @@ sim_logs/
 # Dependencies downloaded by scripts/fetch_deps.sh
 third_party/
 
-# Docker build context prepared by deploy/docker/build.sh
-deploy/docker/_ctx/
+# Terminal log of the controller (--log)
+deploy/robots/*/log/
 
 # Editors
 .vscode/

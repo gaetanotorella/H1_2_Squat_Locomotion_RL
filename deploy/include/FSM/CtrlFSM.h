@@ -100,10 +100,9 @@ private:
 
         if(nextStateMode != 0 && !currentState->isState(nextStateMode))
         {
-            // L'ultimo check registrato e' SEMPRE il fallback "lowstate in timeout -> Passive"
-            // (vedi FSMState); tutti gli altri sono transizioni da joystick. Distinguere le due
-            // cose nel log e' indispensabile sul robot reale: un ritorno a Passive per timeout e'
-            // un problema di comunicazione, uno da joystick e' l'operatore.
+            // The last registered check is always the "lowstate timeout -> Passive" fallback (see
+            // FSMState); all the others are joystick transitions. The log tells them apart: on the
+            // real robot a timeout is a communication problem, a joystick transition is the operator.
             const bool byTimeout = (firedCheck == (int)currentState->registered_checks.size() - 1);
             for(auto & state : states)
             {
