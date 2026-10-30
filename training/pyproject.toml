@@ -7,7 +7,7 @@ build-backend = "setuptools.build_meta"
 atomic = true
 profile = "black"
 line_length = 120
-py_version = 310
+py_version = 311
 skip_glob = ["docs/*", "logs/*"]
 group_by_package = true
 
@@ -51,7 +51,6 @@ known_isaaclabparty = [
     "isaaclab",
     "isaaclab_tasks",
     "isaaclab_assets",
-    "isaaclab_mimic",
     "isaaclab_rl"
 ]
 
@@ -70,7 +69,7 @@ exclude = [
 ]
 
 typeCheckingMode = "basic"
-pythonVersion = "3.10"
+pythonVersion = "3.11"
 pythonPlatform = "Linux"
 enableTypeIgnoreComments = true
 

@@ -1,35 +1,23 @@
 [package]
 
 # Semantic Versioning is used: https://semver.org/
-version = "0.1.0"
+version = "1.0.0"
 
 # Description
 category = "isaaclab"
 readme  = "README.md"
 
-title = "Unitree RL Lab"
-author = "Unitree Robotics"
-maintainer = "Unitree Robotics"
-description="reinforcement learning environments for Unitree robots"
-repository = "https://github.com/unitreerobotics/unitree_rl_lab"
-keywords = ["extension", "template", "isaaclab"]
+title = "H1_2 Squat Locomotion RL"
+author = "Gaetano Torella"
+maintainer = "Gaetano Torella"
+description="Walking and squatting policy for the Unitree H1_2, derived from unitree_rl_lab"
+repository = "https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL"
+keywords = ["isaaclab", "reinforcement-learning", "humanoid", "unitree-h1-2"]
 
 [dependencies]
 "isaaclab" = {}
-"isaaclab_assets" = {}
-"isaaclab_mimic" = {}
 "isaaclab_rl" = {}
 "isaaclab_tasks" = {}
-# NOTE: Add additional dependencies here
 
 [[python.module]]
 name = "unitree_rl_lab"
-
-[isaaclab_settings]
-# TODO: Uncomment and list any apt dependencies here.
-#       If none, leave it commented out.
-# apt_deps = ["example_package"]
-# TODO: Uncomment and provide path to a ros_ws
-#       with rosdeps to be installed. If none,
-#       leave it commented out.
-# ros_ws = "path/from/extension_root/to/ros_ws"

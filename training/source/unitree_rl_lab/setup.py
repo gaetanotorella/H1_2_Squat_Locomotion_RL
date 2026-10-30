@@ -12,8 +12,9 @@ EXTENSION_TOML_DATA = toml.load(os.path.join(EXTENSION_PATH, "config", "extensio
 
 # Minimum dependencies required prior to installation
 INSTALL_REQUIRES = [
-    # NOTE: Add dependencies
+    "argcomplete",
     "psutil",
+    "rsl-rl-lib==5.0.1",
 ]
 
 # Installation operation
@@ -29,11 +30,11 @@ setup(
     install_requires=INSTALL_REQUIRES,
     license="Apache 2.0",
     include_package_data=True,
-    python_requires=">=3.10",
+    python_requires=">=3.11",
     classifiers=[
         "Natural Language :: English",
-        "Programming Language :: Python :: 3.10",
-        "Isaac Sim :: 4.5.0",
+        "Programming Language :: Python :: 3.11",
+        "Isaac Sim :: 5.1.0",
     ],
     zip_safe=False,
 )
