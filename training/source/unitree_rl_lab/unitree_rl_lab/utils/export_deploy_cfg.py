@@ -26,7 +26,7 @@ def export_deploy_cfg(env: ManagerBasedRLEnv, log_dir):
 
     cfg = {}  # noqa: SIM904
     cfg["joint_ids_map"] = joint_ids_map
-    cfg["joint_names"] = list(asset.data.joint_names)  # ordine-policy, per etichettare i log/CSV
+    cfg["joint_names"] = list(asset.data.joint_names)  # policy joint order, used to label the logs
     cfg["step_dt"] = env.cfg.sim.dt * env.cfg.decimation
     stiffness = np.zeros(len(joint_sdk_names))
     stiffness[joint_ids_map] = asset.data.default_joint_stiffness[0].detach().cpu().numpy().tolist()
@@ -57,21 +57,18 @@ def export_deploy_cfg(env: ManagerBasedRLEnv, log_dir):
             cfg["commands"]["base_velocity"]["speed_scale"] = {
                 "zero_height": float(zero_h),
                 "full_height": float(bv.speed_scale_full_height),
-                # esponente della curva (0.5 = radice). Assente -> il controller usa 1.0, cioe' il
-                # comportamento delle policy addestrate prima del round 7.
+                # exponent of the curve (0.5 = square root); when absent the controller uses 1.0
                 "exponent": float(getattr(bv, "speed_scale_exponent", 1.0)),
-                # pavimento con cui la stessa scala moltiplica la soglia "comando ~ zero" del
-                # clock del passo. Deve combaciare con command_gate_threshold nel training.
+                # floor of the scale when it multiplies the "command ~ zero" threshold of the gait
+                # clock; must match command_gate_threshold in training
                 "threshold_min_scale": float(getattr(bv, "threshold_min_scale", 0.2)),
             }
 
-        # ROUND 9: CUTOFF invece dello scaling. In training gli env che camminano non scendono mai
-        # sotto min_height_while_walking (0.70): sotto quella quota la policy non ha MAI visto un
-        # comando di velocita' non nullo. Il controller azzera quindi il comando sotto la stessa
-        # quota, cosi' il deploy resta dentro la distribuzione di training invece di chiedere una
-        # manovra mai addestrata (misurato in R5 a 0.60 con comando pieno: sway 0.05-0.13, roll
-        # -4.9 deg). Sopra il cutoff il comando e' pieno, come in training. Unica fonte di verita':
-        # il pavimento del command term; assente -> nessun cutoff.
+        # Velocity cutoff: walking envs never go below min_height_while_walking in training, so
+        # below that height the policy has never seen a non-zero velocity command. The controller
+        # zeroes the command below the same height and passes it unchanged above, which keeps the
+        # deploy inside the training distribution. Single source of truth: the command term's floor;
+        # when absent, no cutoff.
         if hasattr(env.cfg.commands, "base_height"):
             floor = getattr(env.cfg.commands.base_height, "min_height_while_walking", None)
             if floor is not None:

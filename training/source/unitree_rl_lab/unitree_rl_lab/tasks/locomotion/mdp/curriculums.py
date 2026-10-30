@@ -43,9 +43,8 @@ def lin_vel_cmd_levels(
                 / env.max_episode_length_s
             )
             ang_weight = env.reward_manager.get_term_cfg("track_ang_vel_z").weight
-            # Soglia 0.55 (non 0.8 come per lin_vel): il tracking di yaw plafona strutturalmente piu'
-            # in basso (il passo induce disturbo di imbardata), quindi con 0.8 il range smetteva di
-            # espandersi troppo presto -> al deploy il giro restava sotto-allenato (guadagno 0.40).
+            # Threshold 0.55 (not 0.8 as for lin_vel): yaw tracking plateaus lower by nature (the
+            # gait itself disturbs the yaw), so with 0.8 the range stopped expanding too early.
             if ang_reward > ang_weight * 0.55:
                 delta_command = torch.tensor([-0.1, 0.1], device=env.device)
                 ranges.ang_vel_z = torch.clamp(

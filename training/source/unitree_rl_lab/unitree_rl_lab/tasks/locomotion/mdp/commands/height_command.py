@@ -20,8 +20,8 @@ class UniformHeightCommand(CommandTerm):
     robot first masters standing/walking near the nominal height, then learns to squat.
 
     If ``cfg.only_when_standing`` is True, envs that are NOT standing (i.e. have a non-zero
-    ``base_velocity`` command) keep the nominal height, so the squat is learned at ~zero
-    velocity (Phase A). Set it False to learn squat-while-walking (Phase B).
+    ``base_velocity`` command) keep the nominal height, so the squat is learned at ~zero velocity;
+    ``cfg.rel_squat_while_walking`` then gives a squat depth to a fraction of the walking envs too.
     """
 
     cfg: UniformHeightCommandCfg
@@ -49,14 +49,13 @@ class UniformHeightCommand(CommandTerm):
             standing = vel_term.is_standing_env[env_ids].unsqueeze(1)
             gets_squat = standing
             if self.cfg.rel_squat_while_walking > 0.0:
-                # Fase B PARZIALE: una frazione degli env in cammino riceve comunque una profondita'
+                # a fraction of the walking envs also receives a squat depth
                 walking_squat = (torch.rand_like(h) < self.cfg.rel_squat_while_walking) & ~standing
                 if self.cfg.min_height_while_walking is not None or self.cfg.max_height_while_walking is not None:
-                    # Finestra di profondita' SOLO per chi cammina; gli env fermi restano liberi.
-                    # Rimappa affine invece di troncare: un clamp accumulerebbe TUTTI i campioni
-                    # fuori finestra sugli estremi (col range [0.60,0.98] e pavimento 0.70 sarebbe
-                    # un picco del 26% esattamente a 0.70), qui la distribuzione resta uniforme
-                    # sulla finestra.
+                    # Depth window for the walking envs only; standing envs keep the full range.
+                    # Affine remap instead of clamping: a clamp would pile all the samples outside
+                    # the window on its edges (a 26% peak at exactly 0.70 with range [0.60, 0.98]),
+                    # while the remap keeps the distribution uniform over the window.
                     lo_w = lo if self.cfg.min_height_while_walking is None else max(lo, self.cfg.min_height_while_walking)
                     hi_w = hi if self.cfg.max_height_while_walking is None else min(hi, self.cfg.max_height_while_walking)
                     if hi_w <= lo_w:
@@ -105,49 +104,32 @@ class UniformHeightCommandCfg(CommandTermCfg):
 
     only_when_standing: bool = True
     """If True, only standing envs (zero velocity command) receive a squat depth; walking
-    envs keep the nominal height. Set False for squat-while-walking (Phase B)."""
+    envs keep the nominal height. Set False to give a squat depth to every walking env."""
 
     rel_squat_while_walking: float = 0.0
     """Fraction of the WALKING envs that also receive a squat depth, on top of the standing ones
-    (partial Phase B). Only meaningful when ``only_when_standing`` is True.
+    Only meaningful when ``only_when_standing`` is True.
 
-    Why a fraction and not the all-or-nothing switch: with ``only_when_standing=False`` (round 2,
-    every walking env squatting) locomotion degraded measurably -- terrain_levels 4.78 -> 2.61,
-    track_lin_vel_xy 0.835 -> 0.733, vx gain 0.68 -> 0.58. With True, walking-while-squatting is
-    out of distribution by construction and the sim2sim gains collapsed to 0.09-0.28 at half squat.
-    A fraction keeps the skill in distribution without letting it dominate the batch."""
+    Why a fraction and not the all-or-nothing switch: with every walking env squatting,
+    locomotion degraded measurably; with none, walking while crouched is out of distribution by
+    construction and the velocity tracking collapsed at half squat. A fraction keeps the skill in
+    distribution without letting it dominate the batch."""
 
     min_height_while_walking: float | None = None
     """Depth floor applied ONLY to the walking envs selected by ``rel_squat_while_walking``.
     ``None`` disables it; standing envs are never affected and keep the full curriculum range.
 
-    Why (measured on ``sim_2026-09-07_14-23-00``, full command protocol at three heights): command
-    gains collapse with depth and hit zero at the bottom --
-
-        height   vx fwd   vx bwd    vy      wz
-        0.98      1.02     0.60    0.63    0.73
-        0.76      0.55     0.16    0.13    0.47
-        0.60      0.28    -0.03   -0.01    0.13
-
-    and the sway triples there. It is NOT a torque or range limit -- in single support the knee
-    would use 54% of its limit and the ankle 2% -- but at 0.60 m the gait is simply gone (knee
-    oscillation 0.014 vs 0.123 standing). Letting a third of the walking envs sample depths where
-    locomotion currently yields nothing spends gradient on a task that fails anyway, instead of on
-    0.76-0.85 where the recovery is realistic. Lower the floor in a later round, once walking at
-    half squat is solid."""
+    Why: the velocity tracking gains collapse with depth and reach zero at the deepest squat
+    (forward gain 1.02 at 0.98 m, 0.55 at 0.76 m, 0.28 at 0.60 m) while the sway triples. It is not a
+    torque or range limit; at 0.60 m the gait is simply gone. Sampling walking envs there spends
+    gradient on a task that fails anyway, instead of on the heights where walking is realistic."""
 
     max_height_while_walking: float | None = None
-    """Tetto di quota applicato SOLO agli env in cammino selezionati da ``rel_squat_while_walking``.
+    """Height ceiling applied ONLY to the walking envs selected by ``rel_squat_while_walking``.
+    ``None`` disables it (final configuration).
 
-    ROUND 8. Con la sola finestra inferiore (0.70) gli env che squattano camminando campionavano
-    uniformemente su [0.70, 0.98], ma sopra 0.85 il robot cammina gia' bene: quei campioni non
-    insegnano nulla. Misurato nel confronto a cinque policy (sim_logs/automatic, 2026-09-13): a
-    0.74 m il guadagno laterale e' 0.25 NONOSTANTE il comando (0.190) superi ampiamente la soglia
-    del clock del passo (0.060) -- quindi non e' piu' un problema di gate, e' che la manovra e'
-    quasi assente dal batch. Con rel=0.35 e quote uniformi su [0.70, 0.98], la frazione di campioni
-    entro +-3 cm da 0.74 era il 7.5% degli env in cammino, e di quelli un terzo ha vy dominante:
-    circa il 2.5%. Chiudendo la finestra a 0.85 e alzando rel a 0.50 la densita' nella fascia utile
-    passa dal 19% al 50% degli env in cammino, 2.6 volte tanto."""
+    Above about 0.85 m the robot already walks well, so walking samples there teach little;
+    with a ceiling the walking samples concentrate in the useful mid range."""
 
     @configclass
     class Ranges:

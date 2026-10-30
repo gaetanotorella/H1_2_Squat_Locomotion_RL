@@ -22,7 +22,7 @@ def randomize_body_com(
 ):
     """Randomize the CENTER OF MASS offset of selected bodies (persistent within an episode).
 
-    WHY THIS EXISTS (measured on the real robot, 2026-09-04): with the same policy, the H1_2
+    WHY THIS EXISTS (measured on the real robot): with the same policy, the H1_2
     stood with its CoM ~3-6 cm FURTHER BACK than the model predicts (estimated from the steady
     ankle torque, tau = M*g*d). That ate more than half of the backward stability margin
     (10.7 cm in sim -> 4.1 cm real, with the heel edge at -8.6 cm) and made the robot tip onto

@@ -47,14 +47,13 @@ def gait_phase(
     phase[:, 0] = torch.sin(global_phase * torch.pi * 2.0)
     phase[:, 1] = torch.cos(global_phase * torch.pi * 2.0)
 
-    # Opzione C: congela il clock a (0,0) quando il comando e' ~0 (stessa soglia della gait reward).
-    # Elimina il dondolio 1.25 Hz a comando-zero. Deve essere replicato IDENTICO nel deploy C++
-    # (sul robot reale "fermo" = comando joystick sotto soglia).
+    # Freeze the clock at (0, 0) when the command is ~0 (same threshold as the gait reward): this
+    # removes the 1.25 Hz sway at zero command. The C++ controller replicates it identically (on the
+    # real robot "standing" means a joystick command below the threshold).
     if command_name is not None:
         cmd_norm = torch.norm(env.command_manager.get_command(command_name), dim=1, keepdim=True)
-        # ROUND 7: la soglia scala con la profondita' (vedi command_gate_threshold). A fondo squat
-        # il comando e' identicamente 0 e la soglia ha un pavimento > 0, quindi il clock resta
-        # congelato esattamente come prima.
+        # The threshold scales with the squat depth (see command_gate_threshold). At the deepest
+        # squat the command is exactly 0 and the threshold has a floor > 0, so the clock stays frozen.
         thr = command_gate_threshold(env, command_name, threshold)
         if torch.is_tensor(thr):
             thr = thr.unsqueeze(-1)

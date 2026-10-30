@@ -1,3 +1,11 @@
+"""Reward terms of the H1_2 squat task.
+
+Terms not referenced by the final configuration are kept as building blocks for future training:
+stand_still, orientation_l2, upward, joint_position_penalty, feet_stumble, feet_height_body,
+air_time_variance_penalty (from unitree_rl_lab) and heading_hold, path_hold, lateral_drift_on_turn
+(tried during the thesis).
+"""
+
 from __future__ import annotations
 
 import torch
@@ -92,22 +100,14 @@ def ankle_torque_standing(
     Rationale (measured on the real robot): at equilibrium the ankle torque IS the horizontal
     offset of the centre of mass, ``tau = M*g*d``. A posture that needs little ankle torque is a
     posture whose CoM sits over the ankle, i.e. with the MAXIMUM margin before tipping onto the
-    heels. Nothing in the reward set rewarded that margin, and the real robot stood with the CoM
-    4.5 cm behind the ankle -- 4.1 cm from the heel edge -- which the squat then consumed.
+    heels. Without this term the real robot stood with the CoM 4.5 cm behind the ankle, 4.1 cm from
+    the heel edge, a margin that the squat then consumed. The foot tilt was also proportional to the
+    ankle tracking error, which is exactly ``tau / kp``.
 
-    It also attacks the mechanism directly: the foot tilt was proportional to the ankle tracking
-    error (r = 0.980), and that error is exactly ``tau / kp``.
-
-    Gated on standing envs AND on being SETTLED at the commanded height -- at ANY depth, not only
-    near the nominal one. The original version also required a near-nominal height command, on the
-    assumption that "in a squat a large ankle torque is legitimate and unavoidable". The CoM-shifted
-    sim2sim of 2026-09-06 disproved that: on the nominal model the policy holds full squat (0.60 m)
-    with only -2.1 N*m of total ankle torque, and where this term is ACTIVE it absorbs 69% of an
-    injected CoM offset against 43% where it is gated off. The gate was leaving performance on the
-    table exactly where the stability margin is thinnest.
-
-    The settle gate (|h - h_cmd| < height_tol) still keeps the term out of the squat TRANSITION,
-    where a large ankle torque really is unavoidable.
+    Gated on standing envs AND on being SETTLED at the commanded height, at any depth: in a CoM-shifted
+    sim2sim test the policy compensated a much larger part of the offset where the term was active.
+    The settle gate (|h - h_cmd| < height_tol) keeps the term out of the squat TRANSITION, where a
+    large ankle torque really is unavoidable.
 
     NOTE: uses L1 (|tau|) and not L2 on purpose. The goal is to shape the STEADY-STATE posture,
     not to punish transients: with the square, a 60 Nm recovery spike would cost ~0.7 (about 5x
@@ -145,13 +145,13 @@ def flat_orientation_asym(
       * forward pitch (``g_x > 0``) is free inside a dead-band that grows LINEARLY with the
         commanded squat depth, and quadratic beyond it.
 
-    At the nominal standing height the dead-band is exactly 0, so this term is bit-for-bit
-    identical to ``flat_orientation_l2`` while standing and walking tall -- the walking posture
-    learned so far is preserved, and there is no discontinuity when the squat starts.
+    At the nominal standing height the dead-band is exactly 0, so this term is identical to
+    ``flat_orientation_l2`` while standing and walking tall, and there is no discontinuity when the
+    squat starts.
 
     Args:
         forward_deadband: dead-band at the DEEPEST squat, in units of ``g_x`` (= sin(pitch)).
-            0.35 ~= 20 deg. Measured reference: the policy leans +6.5 deg at full squat in sim.
+            0.35 ~= 20 deg.
     """
     asset: Articulation = env.scene[asset_cfg.name]
     grav = asset.data.projected_gravity_b
@@ -228,7 +228,7 @@ def orientation_l2(
 
 
 def upward(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = SceneEntityCfg("robot")) -> torch.Tensor:
-    """Penalize z-axis base linear velocity using L2 squared kernel."""
+    """Reward an upright base: ``(1 - g_z)^2``, maximal when the projected gravity points down."""
     # extract the used quantities (to enable type-hinting)
     asset: RigidObject = env.scene[asset_cfg.name]
     reward = torch.square(1 - asset.data.projected_gravity_b[:, 2])
@@ -322,10 +322,9 @@ def feet_contact_without_cmd(
 
     command_norm = torch.norm(env.command_manager.get_command(command_name), dim=1)
     reward = torch.sum(is_contact, dim=-1).float()
-    # ROUND 7: soglia proporzionale alla scala di profondita'. Con la soglia fissa questo termine
-    # si accendeva su tutti gli env accovacciati che AVEVANO un comando di cammino (sotto 0.73 m
-    # il laterale a fondo corsa valeva 0.109), pagandoli 0.5/step per tenere i piedi piantati
-    # mentre track_lin_vel ne metteva in palio 0.135: vinceva stare fermi.
+    # The "no command" threshold scales with the squat depth (command_gate_threshold): with a fixed
+    # one, crouched environments with a small but real walking command were paid for keeping both
+    # feet planted, and standing still won over tracking.
     return reward * (command_norm < command_gate_threshold(env, command_name, 0.1))
 
 
@@ -391,11 +390,9 @@ def joint_mirror(
     """Penalize L/R asymmetry ``(L-R)^2`` on joint pairs that mirror with the SAME sign.
 
     ``command_name`` (optional): if given, the penalty is applied ONLY on the standing envs of
-    that velocity command. This matters for walking: a gait is ANTI-PHASE by construction, so an
-    ungated ``(L-R)^2`` penalizes exactly what makes stepping work. Measured on the 2026-09-04
-    run: the term sat at -0.023/-0.031, i.e. actively violated by the gait, against a
-    ``track_lin_vel_xy`` of +0.73 (~4% drag). Gating it on standing envs keeps the intent
-    (a symmetric squat) and removes the conflict.
+    that velocity command. A gait is ANTI-PHASE by construction, so an ungated ``(L-R)^2`` penalizes
+    exactly what makes stepping work; gating it keeps the intent (a symmetric squat) without the
+    conflict.
     """
     # extract the used quantities (to enable type-hinting)
     asset: Articulation = env.scene[asset_cfg.name]
@@ -447,11 +444,10 @@ def joint_mirror_antisym(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg, mirr
 
 
 def _drift_mean(err: torch.Tensor, term, min_time: float) -> torch.Tensor:
-    """Errore MEDIO (per secondo) a partire dall'errore accumulato dal command term.
+    """MEAN error per second, from the error accumulated by the velocity command term.
 
-    Il pavimento su ``drift_time`` evita di dividere per un tempo quasi nullo nei primi istanti
-    dopo il grace: li' l'errore accumulato e' piccolo e il rapporto risulta piccolo, quindi il
-    termine parte generoso e stringe man mano che la finestra si riempie. E' la direzione sicura.
+    The floor on ``drift_time`` avoids dividing by an almost zero time right after the grace
+    period: the term starts lenient and tightens as the window fills, which is the safe direction.
     """
     t = term.drift_time.clamp(min=min_time)
     return err / (t.unsqueeze(-1) if err.dim() == 2 else t)
@@ -460,33 +456,20 @@ def _drift_mean(err: torch.Tensor, term, min_time: float) -> torch.Tensor:
 def heading_hold(
     env: ManagerBasedRLEnv, command_name: str = "base_velocity", std: float = 0.02, min_time: float = 1.0
 ) -> torch.Tensor:
-    """Reward per la RETTILINEITA' angolare: errore di imbardata MEDIO sulla finestra di comando.
+    """Reward angular straightness: MEAN yaw-rate error over the current command window.
 
-    Misurato in sim2sim (sim_2026-09-10_18-08-39), regredendo il rate di imbardata sui bout SENZA
-    comando di yaw:
+    Not used by the final configuration. In sim2sim the uncommanded yaw rate had a constant bias
+    plus a coupling with the walking direction (about +2.7 deg/s when walking sideways at 0.3 m/s),
+    and both changed sign from one policy to another on the same MuJoCo model: the drift comes
+    from the policy, not from the simulator.
 
-        omega_deriva [deg/s] ~= +0.72 - 4.45*vx + 6.52*vy      (residuo RMS 0.80)
+    Why the MEAN and not the instantaneous rate: the two half-cycles of a step differ by 2-7 deg/s,
+    much more than the net drift, which is the uncancelled residual of that oscillation. A penalty on
+    the instantaneous rate would mostly punish a healthy gait; on the mean the oscillation cancels.
+    Why the mean and not the integral: the accumulated error saturates the exponential kernel
+    within one window, while the mean does not depend on the window length.
 
-    cioe' un bias costante piu' un accoppiamento con la direzione di marcia. Camminando di lato a
-    0.30 m/s la deriva vale +2.7 deg/s: in 10 s sono 27 gradi, che curvano visibilmente la
-    traiettoria (fino a 52 cm di scostamento su 2.3 m percorsi). Bias e coefficienti cambiano
-    segno da una policy all'altra a parita' di modello MuJoCo -> e' la policy, non il simulatore.
-
-    PERCHE' MEDIATO E NON ISTANTANEO: scomponendo il rate sulle due semifasi del passo, le due
-    meta' del ciclo differiscono di 2-7 deg/s, cioe' MOLTO PIU' della deriva netta. La deriva e'
-    il residuo non cancellato di quell'oscillazione. Una penalita' sul rate istantaneo punirebbe
-    soprattutto l'andatura sana; sulla media l'oscillazione si annulla e resta solo la deriva.
-
-    PERCHE' LA MEDIA E NON L'INTEGRALE (round 8): la prima versione usava l'errore ACCUMULATO con
-    std in radianti. Misurato nel round 7: il termine ha funzionato a meta' -- gli accoppiamenti
-    sono collassati (vy da +6.21 a -1.07, vx da -1.54 a -0.17) ma il modulo complessivo e' sceso
-    solo da 1.70+-0.18 a 1.23+-0.22 deg/s. Il problema e' la saturazione: a 1.7 deg/s su 9.5 s
-    l'errore accumulato e' 0.28 rad contro std 0.25, quindi exp(-1.25) = 0.29 con gradiente gia'
-    quasi piatto. Dividendo per il tempo il termine non satura mai e non dipende dalla lunghezza
-    della finestra.
-
-    ``std`` in rad/s. 0.02 = 1.15 deg/s. Con i valori misurati: R6 (1.70 deg/s) -> 0.11,
-    R7 (1.23) -> 0.32, una policy pulita a 0.3 deg/s -> 0.93. Il range utile e' tutto coperto.
+    ``std`` in rad/s: 0.02 = 1.15 deg/s.
     """
     term = env.command_manager.get_term(command_name)
     return torch.exp(-torch.square(_drift_mean(term.heading_err, term, min_time)) / std**2)
@@ -495,37 +478,21 @@ def heading_hold(
 def path_hold(
     env: ManagerBasedRLEnv, command_name: str = "base_velocity", std: float = 0.03, min_time: float = 1.0
 ) -> torch.Tensor:
-    """Reward per la RETTILINEITA' lineare: scostamento laterale MEDIO dalla traiettoria comandata.
+    """Reward linear straightness: MEAN lateral deviation from the commanded path.
 
-    Sovrapposto a ogni modalita' di camminata, in sim2sim si misura un creep costante nel
-    riferimento del corpo, ortogonale al comando, che nessun termine di tracking vede: con std
-    0.5/0.25 un creep di 0.02 m/s mette in palio 0.0048 per step su ~120 di reward totale.
+    Not used by the final configuration: it penalizes the sway that lateral stepping necessarily
+    produces, and at weight 1.0 it suppressed lateral and turning locomotion.
 
-    E' anche la spiegazione del giro sul posto: velocita' costante nel body frame + omega costante
-    = arco di cerchio di raggio |v|/omega. Previsto 0.108 e 0.093 m, spostamento netto previsto
-    0.209 e 0.175 m su 152 e 139 gradi di rotazione; misurato 0.208 e 0.182. Accordo entro il 4%.
-    A comando lineare nullo la direzione e' indefinita e si accumula l'intero vettore velocita',
-    quindi questo termine copre il giro sul posto senza bisogno di un termine dedicato.
+    Every walking mode shows a small constant creep in the body frame, orthogonal to the command,
+    that no tracking term sees. It also explains the circle drawn when turning in place: constant
+    body-frame velocity plus constant yaw rate gives an arc of radius |v|/omega. With a zero linear
+    command the whole velocity vector is accumulated, so this term also covers turning in place.
 
-    L'accumulo (in ``UniformLevelVelocityCommand._accumulate_drift``) usa solo la componente
-    PERPENDICOLARE al comando: quella parallela e' il normale ritardo di inseguimento e
-    penalizzarla renderebbe questo un track_lin_vel piu' duro invece che un termine di
-    rettilineita'.
+    The accumulation (``UniformLevelVelocityCommand._accumulate_drift``) uses only the component
+    PERPENDICULAR to the command: the parallel one is the normal tracking lag. Note that a robot
+    that does not move has zero perpendicular error, so this term cannot replace velocity tracking.
 
-    ROUND 8 -- due correzioni, entrambe misurate:
-
-    1. MEDIA invece di integrale. Nel round 7 il termine e' stato CONTROPRODUCENTE: il creep
-       laterale e' passato da 0.0165+-0.0014 (round 6, senza il termine) a 0.0309+-0.0033 m/s,
-       una differenza di 4 sigma. E in addestramento il suo valore e' CALATO (0.183 -> 0.168):
-       la policy lo ha barattato via.
-    2. Il difetto di fondo della versione a integrale: con ``err = v - cmd`` e la proiezione che
-       toglie la componente lungo il comando, un robot FERMO da' err_perp = -cmd + (cmd.u)u = 0
-       ESATTO. Il termine dava reward pieno a chi non si muove: non distingueva "cammina dritto"
-       da "non cammina". Con la media il problema resta formalmente, ma il peso ora e' 1.0 e il
-       compito di far muovere resta di track_lin_vel, che vale 1.5: l'equilibrio e' corretto.
-
-    ``std`` in m/s. 0.03: con i valori misurati R6 (0.0165) -> 0.74, R7 (0.0309) -> 0.35,
-    il creep in rotazione di R7 (0.068) -> 0.006.
+    ``std`` in m/s.
     """
     term = env.command_manager.get_term(command_name)
     mean = _drift_mean(term.path_err, term, min_time)
@@ -541,17 +508,16 @@ def lateral_drift_on_turn(
 ) -> torch.Tensor:
     """Penalize spurious LATERAL body velocity while the command is a pure turn (yaw only).
 
-    Turning in place was the most destabilizing manoeuvre in sim2sim: with ``wz=-0.5`` and zero
-    linear command the robot lurched sideways at up to 0.45 m/s and rolled to -9.1 deg, instead of
-    rotating on the spot. Gated so it is active ONLY when the linear command is ~0 and the yaw
-    command is significant -> it never fights a commanded lateral motion.
+    Not used by the final configuration: it had no measurable effect. Turning in place was the most
+    destabilizing manoeuvre in sim2sim (the robot lurched sideways instead of rotating on the spot).
+    Gated so it is active ONLY when the linear command is ~0 and the yaw command is significant, so
+    it never fights a commanded lateral motion.
     """
     asset: Articulation = env.scene[asset_cfg.name]
     command = env.command_manager.get_command(command_name)
     lin_cmd_norm = torch.norm(command[:, :2], dim=1)
-    # "comando lineare ~ zero" e' una soglia sul comando -> scala con la profondita', altrimenti a
-    # meta' squat un comando lineare piccolo-ma-vero verrebbe scambiato per assenza di comando.
-    # "yaw significativo" resta assoluta: e' una soglia sull'ENTITA' della manovra da penalizzare.
+    # "Zero linear command" scales with the squat depth, otherwise at mid squat a small but real
+    # linear command would be taken for no command; "significant yaw" stays absolute.
     pure_turn = (lin_cmd_norm < command_gate_threshold(env, command_name, lin_cmd_thresh)) & (
         torch.abs(command[:, 2]) > ang_cmd_thresh
     )
