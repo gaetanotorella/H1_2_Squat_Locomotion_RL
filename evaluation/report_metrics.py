@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""Metriche FISSE di un run di protocollo, per confrontare policy diverse sugli stessi comandi.
+"""FIXED metrics of a protocol run, to compare different policies on the same commands.
 
-Il vantaggio di un protocollo scriptato e' che la segmentazione non va indovinata dai dati: si
-legge da protocol.yaml quale manovra era in corso in quale istante di simulazione. Due run dello
-stesso protocollo producono quindi le stesse righe, confrontabili una a una.
+The advantage of a scripted protocol is that the segmentation does not have to be guessed from the
+data: protocol.yaml says which manoeuvre was running at which simulation time. Two runs of the same
+protocol therefore produce the same rows, comparable one by one.
 
-    ./report_metrics.py <cartella_run>
+    ./report_metrics.py <run_folder>
 
-Scrive metrics.json (per compare_runs.py) e report.md nella cartella del run.
+Writes metrics.json (for compare_runs.py) and report.md to the run folder.
 """
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ import numpy as np
 import pandas as pd
 import yaml
 
-SETTLE = 2.0      # [s] scartati all'inizio di ogni intervallo (transitorio del comando)
-MIN_DUR = 3.0     # [s] durata minima perche' un intervallo venga misurato
+SETTLE = 2.0      # [s] dropped at the start of every interval (command transient)
+MIN_DUR = 3.0     # [s] minimum duration for an interval to be measured
 NOMINAL = 0.98
 
 
@@ -36,13 +36,13 @@ def build(run: Path):
     obs, err, cmd, gt = load(run)
     t = obs["ep_t"].to_numpy()
 
-    # --- allineamento: protocollo e ground_truth vivono sul tempo di SIMULAZIONE, obs sul
-    # tempo del controller. I due file partono in istanti diversi (il simulatore parte prima),
-    # quindi si allineano su wall_t, che e' l'unico orologio comune.
+    # --- alignment: protocol and ground_truth live on SIMULATION time, obs on the controller's time.
+    # The two files start at different instants (the simulator starts first), so they are aligned on
+    # wall_t, the only common clock.
     gt_wall = gt["wall_t"].to_numpy()
     gt_sim = gt["sim_t"].to_numpy()
     obs_wall = obs["wall_t"].to_numpy()
-    sim_of_ep = np.interp(obs_wall, gt_wall, gt_sim)        # tempo di simulazione a ogni riga di obs
+    sim_of_ep = np.interp(obs_wall, gt_wall, gt_sim)        # simulation time at every obs row
     rs = lambda c: np.interp(obs_wall, gt_wall, gt[c].to_numpy())
 
     d = {}
@@ -72,8 +72,8 @@ def build(run: Path):
     act = obs[[c for c in obs.columns if c.endswith("_act") and "hm" not in c]].to_numpy()
     d["dact"] = np.append(np.linalg.norm(np.diff(act, axis=0), axis=1), 0.0)
 
-    # fattore di real-time: il protocollo gira sul tempo di simulazione, il controller sul suo
-    # orologio a 50 Hz. Se divergono, le quote comandate non sono quelle scritte nel protocollo.
+    # real-time factor: the protocol runs on simulation time, the controller on its 50 Hz clock. If
+    # they diverge, the commanded heights are not those written in the protocol.
     span_sim = gt_sim[-1] - gt_sim[0]
     span_wall = gt_wall[-1] - gt_wall[0]
     d["rtf"] = span_sim / span_wall if span_wall > 0 else float("nan")
@@ -81,7 +81,7 @@ def build(run: Path):
 
 
 def intervals(proto):
-    """Intervalli (sim time) con lo stato appiccicoso risolto, come nel joystick scriptato."""
+    """Intervals (sim time) with the sticky state resolved, as in the scripted joystick."""
     out, cur = [], {"vx": 0.0, "vy": 0.0, "wz": 0.0, "height": float(proto.get("nominal_height", NOMINAL)), "do": None}
     tl = proto["timeline"]
     for i, n in enumerate(tl):
@@ -111,30 +111,26 @@ def measure(run: Path):
         m = (d["sim_t"] >= a_sim) & (d["sim_t"] < b_sim)
         if m.sum() < 50:
             continue
-        # Quota di riferimento: il target EFFETTIVAMENTE ricevuto dal controller, non quello scritto
-        # nel protocollo. I due divergono: il joystick scriptato integra la sua rampa contro il
-        # tempo di simulazione, il controller fa `squat_target -= 0.15*step_dt` una volta per passo
-        # di policy con step_dt nominale 0.02, e il suo ciclo gira a ~46 Hz -> sotto-integra dell'8%
-        # e l'errore si accumula a ogni rampa (misurato: 0.85 -> 0.860, 0.74 -> 0.761, 0.66 -> 0.692,
-        # 0.60 -> 0.641). Misurare contro il protocollo attribuiva al robot un cedimento di 4 cm che
-        # era tutto disallineamento del banco: l'errore di inseguimento vero e' <= 5 mm.
-        # media sulla SECONDA META' del segmento: con le rampe del controller a 0.05 m/s una risalita
-        # da 0.60 dura 7.6 s e il segmento la contiene per intero -> la media su tutto darebbe un
-        # falso "scarto del banco".
+        # Reference height: the target ACTUALLY received by the controller, not the one written in
+        # the protocol. The two can differ (the scripted joystick integrates its ramp on simulation
+        # time, the controller once per policy step on its own clock), and measuring against the
+        # protocol would attribute the bench offset to the robot.
+        # Mean over the SECOND HALF of the segment: with 0.05 m/s ramps a rise from 0.60 takes 7.6 s
+        # and fits entirely in the segment, so the mean over all of it would be biased.
         idx_m = np.where(m)[0]; m2 = np.zeros_like(m); m2[idx_m[len(idx_m) // 2:]] = True
         h_ctrl = float(d["hcmd"][m2].mean())
         cx, cy, cw = s["vx"], s["vy"], s["wz"]
-        # comando EFFETTIVO visto dalla policy (dopo lo scaling per profondita' del controller)
+        # command ACTUALLY seen by the policy (after the controller's depth scaling or cutoff)
         sc = d["vc"][m].mean(axis=0)
         ax, ay, aw = d["vxb"][m].mean(), d["vyb"][m].mean(), d["wz"][m].mean()
         g = lambda a, c: (a / c) if abs(c) > 0.02 else None
         rows.append({
             "t0": round(s["t0"], 1), "dur": round(b_sim - a_sim, 1),
-            "h_cmd": s["height"],                      # quota chiesta dal protocollo
-            "h_ctrl": round(h_ctrl, 4),                # quota effettivamente comandata al robot
-            "h_act": round(float(d["bz"][m2].mean()), 4),                 # stessa finestra di h_ctrl
-            "h_err": round(float(d["bz"][m2].mean() - h_ctrl), 4),      # inseguimento VERO
-            "h_drift": round(h_ctrl - s["height"], 4),                 # scarto del banco
+            "h_cmd": s["height"],                      # height requested by the protocol
+            "h_ctrl": round(h_ctrl, 4),                # height actually commanded to the robot
+            "h_act": round(float(d["bz"][m2].mean()), 4),                 # same window as h_ctrl
+            "h_err": round(float(d["bz"][m2].mean() - h_ctrl), 4),      # TRUE tracking error
+            "h_drift": round(h_ctrl - s["height"], 4),                 # bench offset
             "stick": [cx, cy, cw],
             "cmd_scaled": [round(float(v), 3) for v in sc],
             "achieved": [round(float(ax), 3), round(float(ay), 3), round(float(aw), 3)],
@@ -153,7 +149,7 @@ def measure(run: Path):
             if r[k] is not None:
                 r[k] = round(r[k], 3)
 
-    # --- deriva di imbardata: omega = a + b*vx + c*vy sui tratti SENZA comando di yaw --------
+    # --- yaw drift: omega = a + b*vx + c*vy over the segments WITHOUT yaw command ----------------
     lin = [r for r in rows if abs(r["stick"][2]) < 0.05 and (abs(r["stick"][0]) > 0.02 or abs(r["stick"][1]) > 0.02)]
     drift = None
     if len(lin) >= 3:
@@ -172,7 +168,7 @@ def measure(run: Path):
                  "resid_rms_deg_s": round(float(np.degrees((y - A @ c).std())), 2),
                  "n_bouts": len(lin)}
 
-    # --- rettilineita': scostamento dalla retta comandata, e traslazione durante lo yaw puro --
+    # --- straightness: deviation from the commanded line, and translation during pure yaw -------
     straight, turns = [], []
     for r in rows:
         m = np.where((d["sim_t"] >= r["t0"] + SETTLE) & (d["sim_t"] < r["t0"] + SETTLE + r["dur"]))[0]
@@ -197,49 +193,47 @@ def measure(run: Path):
                              "dev_pct": round(float(100 * abs(perp[-1]) / max(abs(along[-1]), 1e-6)), 1),
                              "dyaw_deg": round(dyaw, 1)})
 
-    # --- controlli di validita' del run ------------------------------------------------------
+    # --- validity checks of the run ------------------------------------------------------------------
     checks = []
     if not (0.97 <= d["rtf"] <= 1.03):
-        checks.append(f"real-time factor {d['rtf']:.3f} fuori da [0.97, 1.03]: il joystick scriptato "
-                      f"gira sul tempo di simulazione e il controller sul suo orologio -> le quote "
-                      f"comandate possono non essere quelle del protocollo")
+        checks.append(f"real-time factor {d['rtf']:.3f} outside [0.97, 1.03]: the scripted joystick "
+                      f"runs on simulation time and the controller on its own clock, so the commanded "
+                      f"heights may differ from the protocol")
     for r in rows:
-        # inseguimento del robot: deve essere stretto, il target e' una rampa lenta gia' assestata
+        # robot tracking: must be tight, the target is a slow ramp that has already settled
         if abs(r["h_err"]) > 0.01:
-            checks.append(f"t={r['t0']}: target del controller {r['h_ctrl']:.3f} ma misurata "
-                          f"{r['h_act']:.3f} (errore {r['h_err']:+.3f} m)")
-    # scarto del banco: il controller non ha ricevuto la quota scritta nel protocollo.
-    # Non invalida il confronto fra policy (e' identico in tutti i run), ma va VISTO: con la
-    # vecchia soglia di 5 cm uno scarto di 4.1 cm passava in silenzio. Raggruppato per quota:
-    # altrimenti la stessa riga si ripete per ogni segmento tenuto a quella profondita'.
-    # NB: non chiamarla `drift` -- quel nome e' gia' la regressione della deriva di imbardata
-    # qualche riga sopra, e sovrascriverlo la farebbe sparire dal metrics.json.
+            checks.append(f"t={r['t0']}: controller target {r['h_ctrl']:.3f} but measured "
+                          f"{r['h_act']:.3f} (error {r['h_err']:+.3f} m)")
+    # Bench offset: the controller did not receive the height written in the protocol. It does not
+    # invalidate a comparison between policies (it is the same in every run), but it must be VISIBLE.
+    # Grouped by height, otherwise the same line repeats for every segment held at that depth.
+    # Not named `drift`: that name is already the yaw drift regression above.
     h_groups: dict = {}
     for r in rows:
         if abs(r["h_drift"]) > 0.01:
             h_groups.setdefault((r["h_cmd"], r["h_ctrl"], r["h_drift"]), []).append(r["t0"])
     for (hc, hk, hd), ts in sorted(h_groups.items()):
-        checks.append(f"il protocollo chiede {hc:.3f} ma il controller ha ricevuto {hk:.3f} "
-                      f"({hd:+.3f} m di scarto del banco) — segmenti t={', '.join(f'{t:g}' for t in ts)}")
+        checks.append(f"the protocol asks for {hc:.3f} but the controller received {hk:.3f} "
+                      f"({hd:+.3f} m bench offset) — segments t={', '.join(f'{t:g}' for t in ts)}")
     return {"rtf": round(float(d["rtf"]), 4), "segments": rows, "yaw_drift": drift,
             "straight": straight, "turns": turns, "checks": checks}
 
 
 def render(run: Path, met: dict) -> str:
     meta = json.loads((run / "run_meta.json").read_text()) if (run / "run_meta.json").exists() else {}
-    L = [f"# Report protocollo — {run.name}", ""]
-    L += [f"- protocollo: `{meta.get('protocol', '?')}`",
+    L = [f"# Protocol report — {run.name}", ""]
+    L += [f"- protocol: `{meta.get('protocol', '?')}`",
           f"- policy: `{meta.get('policy', '?')}`",
-          f"- etichetta: {meta.get('label') or '—'}",
-          f"- commit: `{meta.get('git_commit', '?')}`" + (" **(albero sporco)**" if meta.get("git_dirty") else ""),
+          f"- label: {meta.get('label') or '—'}",
+          f"- commit: `{meta.get('git_commit', '?')}`" + (" **(dirty tree)**" if meta.get("git_dirty") else ""),
           f"- real-time factor: {met['rtf']:.4f}", ""]
     if met["checks"]:
-        L += ["## ⚠ Controlli falliti", ""] + [f"- {c}" for c in met["checks"]] + [""]
+        L += ["## ⚠ Failed checks", ""] + [f"- {c}" for c in met["checks"]] + [""]
     else:
-        L += ["Tutti i controlli di validita' superati.", ""]
+        L += ["All validity checks passed.", ""]
 
-    L += ["## Segmenti", "",
-          "| t0 | dur | h prot | h ctrl | h mis | err | stick | cmd scalato | ottenuto | gain | sway | pitch | rollSD | gyro | gait% | tau cav | knee | Δact |",
+    L += ["## Segments", "",
+          "| t0 | dur | h prot | h ctrl | h meas | err | stick | cmd scaled | achieved | gain | sway | pitch | rollSD | gyro | gait% | tau ankle | knee | Δact |",
           "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for r in met["segments"]:
         gains = " / ".join("—" if r[k] is None else f"{r[k]:.2f}" for k in ("gain_vx", "gain_vy", "gain_wz"))
@@ -252,19 +246,19 @@ def render(run: Path, met: dict) -> str:
 
     if met["yaw_drift"]:
         y = met["yaw_drift"]
-        L += ["", "## Deriva di imbardata (tratti senza comando di yaw)", "",
+        L += ["", "## Yaw drift (segments without yaw command)", "",
               f"`omega [deg/s] = {y['bias_deg_s']:+.2f} {y['per_vx_deg_s']:+.2f}*vx {y['per_vy_deg_s']:+.2f}*vy` "
-              f"— residuo RMS {y['resid_rms_deg_s']:.2f}, {y['n_bouts']} tratti"]
+              f"— residual RMS {y['resid_rms_deg_s']:.2f}, {y['n_bouts']} segments"]
 
     if met["straight"]:
-        L += ["", "## Rettilineita' (tratti lineari)", "",
-              "| t0 | h | comando | percorso | scostamento | % | Δyaw |", "|---|---|---|---|---|---|---|"]
+        L += ["", "## Straightness (linear segments)", "",
+              "| t0 | h | command | travelled | deviation | % | Δyaw |", "|---|---|---|---|---|---|---|"]
         for s in met["straight"]:
             L.append(f"| {s['t0']} | {s['h']:.2f} | {s['cmd'][0]:+.2f},{s['cmd'][1]:+.2f} | {s['along_m']:+.2f} m | "
                      f"{s['dev_m']:+.3f} m | {s['dev_pct']:.0f}% | {s['dyaw_deg']:+.1f}° |")
 
     if met["turns"]:
-        L += ["", "## Giro sul posto", "", "| t0 | h | wz | Δyaw | spostamento netto |", "|---|---|---|---|---|"]
+        L += ["", "## Turning in place", "", "| t0 | h | wz | Δyaw | net displacement |", "|---|---|---|---|---|"]
         for s in met["turns"]:
             L.append(f"| {s['t0']} | {s['h']:.2f} | {s['wz']:+.3f} | {s['dyaw_deg']:+.1f}° | {s['net_disp_m']:.3f} m |")
     return "\n".join(L) + "\n"
@@ -273,12 +267,12 @@ def render(run: Path, met: dict) -> str:
 def main() -> int:
     run = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else None
     if run is None or not (run / "protocol.yaml").exists():
-        print("uso: report_metrics.py <cartella_run>   (deve contenere protocol.yaml)")
+        print("usage: report_metrics.py <run_folder>   (must contain protocol.yaml)")
         return 1
     met = measure(run)
     (run / "metrics.json").write_text(json.dumps(met, indent=2))
     (run / "report.md").write_text(render(run, met))
-    print(f"scritti {run/'metrics.json'} e {run/'report.md'}")
+    print(f"written {run/'metrics.json'} and {run/'report.md'}")
     for c in met["checks"]:
         print("  ⚠ " + c)
     return 0

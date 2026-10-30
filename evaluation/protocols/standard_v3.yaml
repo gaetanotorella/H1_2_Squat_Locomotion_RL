@@ -1,30 +1,28 @@
 # ============================================================================================
-# PROTOCOLLO DI TEST STANDARD v3 — H1_2 squat
+# STANDARD TEST PROTOCOL v3 — H1_2 squat (the protocol used for the thesis results)
 #
-# Identico a v2 (stesse manovre, stessi istanti), con due differenze:
-#   1. il mezzo squat della sezione D e' a 0.71 m invece di 0.74: e' la quota minima di camminata
-#      del controller (cutoff_height 0.70 + 1 cm), quella da usare nei test sul robot reale.
-#   2. `stop_height: 0.71` dichiara il FERMO del controller (2026-10-10): R2 da solo si ferma a
-#      cutoff_height + 1 cm, per scendere oltre serve A + R2. Il joystick scriptato fa come una
-#      mano: RT fino al fermo, poi A + RT; e all'arrivo sul fermo dall'alto tiene RT per `overhold`
-#      come agli altri fine corsa, cosi' la quota della sezione D e' esattamente 0.71.
-#      Le discese della sezione C a 0.66 e 0.60 passano quindi dal fermo: il percorso A + R2 e'
-#      collaudato a ogni run. `stop_height` DEVE valere cutoff_height + 0.01 del deploy.yaml della
-#      policy: run_protocol.py lo verifica prima di partire.
+# Sections: A) standing with zero command; B) standing, the six velocity axes; C) height ladder from
+# standing, back to 0.98 every time; D) the six axes at the lowest walking height 0.71 m;
+# E) back up and final standing.
 #
-# v1 e v2 NON sono state toccate. `compare_runs.py` rifiuta di confrontare protocolli diversi.
+# `stop_height: 0.71` declares the controller STOP: R2 alone stops at cutoff_height + 1 cm, going
+# further requires A + R2. The scripted joystick acts like a hand: RT down to the stop, then A + RT;
+# arriving on the stop from above it holds RT for `overhold`, as at the other ends of travel, so the
+# height of section D is exactly 0.71. The descents of section C to 0.66 and 0.60 pass through the
+# stop, so the A + R2 path is exercised at every run. `stop_height` MUST equal cutoff_height + 0.01
+# of the policy's deploy.yaml: run_protocol.py checks it before starting.
 #
-# Semantica: ogni voce ha un istante `t` (tempo di SIMULAZIONE, s) e uno stato APPICCICOSO —
-# vx/vy/wz/height valgono finché non li cambia una voce successiva. `do` è invece un impulso.
-# vx,vy in m/s; wz in rad/s; height in m. Ampiezze a fondo corsa dei range di training
-# (vx ∈ [-0.3, 1.0], vy ∈ [-0.3, 0.3], wz ∈ [-0.5, 0.5]).
+# Semantics: every entry has a time `t` (SIMULATION time, s) and a STICKY state — vx/vy/wz/height hold
+# until a later entry changes them. `do` is a pulse instead. vx, vy in m/s; wz in rad/s; height in m.
+# Amplitudes at the ends of the training ranges (vx in [-0.3, 1.0], vy in [-0.3, 0.3], wz in [-0.5, 0.5]).
+# compare_runs.py refuses to compare runs of different protocols.
 # ============================================================================================
 name: standard_v3
 nominal_height: 0.98
 deepest_height: 0.60
 stop_height: 0.71
-# rampe del target di quota del CONTROLLER (observations.h): il joystick scriptato le usa per
-# sapere quanto tenere RT/B. Se il controller cambia, cambiare qui, o le quote arrivano sbagliate.
+# ramps of the CONTROLLER's height target (observations.h): the scripted joystick uses them to know
+# how long to hold RT/B. If the controller changes, change them here too.
 descend_rate: 0.05
 rise_rate: 0.05
 band_release_at: 12.0
@@ -32,15 +30,15 @@ overhold: 1.5
 stop_at: 306.0
 
 timeline:
-  # ---- avvio ---------------------------------------------------------------------------
+  # ---- start-up ------------------------------------------------------------------------
   - {t:   2.0, do: fixstand}
   - {t:   8.0, do: rl}
   - {t:  14.0, vx: 0.0, vy: 0.0, wz: 0.0}
 
-  # ---- A) stazione eretta, comando nullo: riferimento di sway/lean ----------------------
+  # ---- A) standing, zero command: reference for sway and lean ---------------------------
   - {t:  14.0}
 
-  # ---- B) stazione eretta, i sei assi ---------------------------------------------------
+  # ---- B) standing, the six axes ----------------------------------------------------------
   - {t:  24.0, vx:  1.0}
   - {t:  33.0, vx:  0.0}
   - {t:  37.0, vx: -0.3}
@@ -54,21 +52,21 @@ timeline:
   - {t:  89.0, wz: -0.5}
   - {t:  98.0, wz:  0.0}
 
-  # ---- C) scala di quote da fermo, ogni volta RIPARTENDO da 0.98 ------------------------
-  # Con le rampe a 0.05 m/s: 0.98->0.85 2.6 s, ->0.74 4.8 s, ->0.66 6.4 s, ->0.60 7.6 s, ritorni
-  # uguali + overhold 1.5 s. Gli intervalli lasciano >= 3 s di quota assestata.
+  # ---- C) height ladder from standing, RESTARTING from 0.98 every time --------------------
+  # With 0.05 m/s ramps: 0.98->0.85 2.6 s, ->0.74 4.8 s, ->0.66 6.4 s, ->0.60 7.6 s, same returns
+  # + 1.5 s overhold. The intervals leave >= 3 s at the settled height.
   - {t: 102.0, height: 0.85}
   - {t: 110.0, height: 0.98}
   - {t: 116.0, height: 0.74}
   - {t: 126.0, height: 0.98}
   - {t: 134.0, height: 0.66}
   - {t: 144.0, height: 0.98}
-  - {t: 154.0, height: 0.60}    # 7.6 s di discesa + 24 s a fondo corsa: la tenuta lunga da difendere
+  - {t: 154.0, height: 0.60}    # 7.6 s descent + 24 s at the bottom: the long hold
   - {t: 186.0, height: 0.98}
 
-  # ---- D) quota minima di camminata 0.71 m (fermo del controller), gli stessi sei assi ----
-  # 0.98->0.71 con RT da solo: 5.4 s, poi overhold 1.5 s sul fermo; 2.6 s di quota assestata
-  # prima del primo comando a 206.
+  # ---- D) lowest walking height 0.71 m (controller stop), the same six axes ---------------
+  # 0.98->0.71 with RT alone: 5.4 s, then 1.5 s overhold on the stop; 2.6 s at the settled height
+  # before the first command at 206.
   - {t: 198.0, height: 0.71}
   - {t: 206.0, vx:  1.0}
   - {t: 215.0, vx:  0.0}
@@ -83,6 +81,6 @@ timeline:
   - {t: 271.0, wz: -0.5}
   - {t: 280.0, wz:  0.0}
 
-  # ---- E) ritorno in piedi e fermo finale ------------------------------------------------
+  # ---- E) back up and final standing --------------------------------------------------------
   - {t: 284.0, height: 0.98}
   - {t: 294.0}

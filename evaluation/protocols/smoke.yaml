@@ -1,10 +1,10 @@
-# Protocollo corto di collaudo della catena: non e' un test di policy, serve solo a verificare
-# che avvio, transizioni, rilascio della corda, comandi e logging funzionino end-to-end.
+# Short check of the whole chain: not a policy test, it only verifies that start-up, transitions,
+# band release, commands and logging work end to end.
 name: smoke
 nominal_height: 0.98
 deepest_height: 0.60
-# rampe del target di quota del CONTROLLER (observations.h): il joystick scriptato le usa per
-# sapere quanto tenere RT/B. Se il controller cambia, cambiare qui, o le quote arrivano sbagliate.
+# ramps of the CONTROLLER's height target (observations.h): the scripted joystick uses them to know
+# how long to hold RT/B. If the controller changes, change them here too.
 descend_rate: 0.05
 rise_rate: 0.05
 band_release_at: 12.0
