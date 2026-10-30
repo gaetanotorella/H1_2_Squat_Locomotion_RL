@@ -24,4 +24,4 @@ docker run -d --name h1_2_ctrl --network host \
   -v "$LOG_DIR:$C/sim_logs" \
   "h1_2_ctrl_squat:$ARCH" --network "$IFACE" --log
 echo "started. logs: docker logs -f h1_2_ctrl"
-echo "         stop: docker stop h1_2_ctrl     (SIGTERM: the controller exits and lowcmd stops)"
+echo "         stop: first L2 + B on the remote (Passive), then docker stop h1_2_ctrl"
