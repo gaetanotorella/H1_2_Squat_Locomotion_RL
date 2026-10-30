@@ -290,6 +290,7 @@
     <jointvel name="right_wrist_pitch_vel" joint="right_wrist_pitch_joint" />
     <jointvel name="right_wrist_yaw_vel" joint="right_wrist_yaw_joint" />
 
+    <!-- Joint torques in SDK motor order: the bridge copies sensor i to motor_state[i].tau_est -->
     <jointactuatorfrc name="left_hip_yaw_torque" joint="left_hip_yaw_joint" />
     <jointactuatorfrc name="left_hip_pitch_torque" joint="left_hip_pitch_joint" />
     <jointactuatorfrc name="left_hip_roll_torque" joint="left_hip_roll_joint" />
@@ -318,22 +319,11 @@
     <jointactuatorfrc name="right_wrist_pitch_torque" joint="right_wrist_pitch_joint" />
     <jointactuatorfrc name="right_wrist_yaw_torque" joint="right_wrist_yaw_joint" />
 
-    <!-- IMU — ordine fisso atteso dal bridge: quat(4) gyro(3) accel(3) framepos(3) framelinvel(3) -->
+    <!-- IMU: the simulator bridge expects exactly this order: quat(4) gyro(3) accel(3) framepos(3) framelinvel(3) -->
     <framequat    name="imu_quat" objtype="site" objname="imu"/>
     <gyro         name="imu_gyro" site="imu"/>
     <accelerometer name="imu_acc" site="imu"/>
     <framepos     name="frame_pos" objtype="site" objname="imu"/>
     <framelinvel  name="frame_vel" objtype="site" objname="imu"/>
   </sensor>
-
-  <!-- <weld> RIMOSSO: saldava rigidamente il torso al mondo (bloccava tutti i 6
-       DOF, incluse le rotazioni) -> mentre attivo la policy non poteva equilibrarsi
-       e si assestava col torso indietro al rilascio. Sostituito dall'ElasticBand
-       (molla verticale, ENABLE_ELASTIC_BAND=True in config.py): sostiene il peso
-       lasciando il torso libero di ruotare, con rilascio graduale (tasti 7/8/9). -->
-  <!--
-  <equality>
-    <weld body1="torso_link" body2="world"/>
-  </equality>
-  -->
 </mujoco>

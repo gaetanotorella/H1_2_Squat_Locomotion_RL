@@ -724,7 +724,7 @@ int main(int argc, char **argv)
   }
   param::helper(argc, argv);
   if(param::config.robot_scene.is_relative()) {
-    param::config.robot_scene = proj_dir.parent_path() / "unitree_robots" / param::config.robot / param::config.robot_scene;
+    param::config.robot_scene = proj_dir.parent_path() / "assets" / param::config.robot / param::config.robot_scene;
   }
 
   // simulate object encapsulates the UI

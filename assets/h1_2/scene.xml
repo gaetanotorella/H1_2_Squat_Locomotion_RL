@@ -1,9 +1,5 @@
-<mujoco model="Unitree H1-1">
-  <!-- [V7 2026-07-30] sim2sim HANDLESS: robot senza mani (27 giunti), coerente
-       col training squat_v6 [V7] e col deploy (92 obs). Per tornare CON le mani,
-       riattiva h1_2.xml e commenta h1_2_handless.xml. -->
+<mujoco model="Unitree H1_2 scene">
   <include file="h1_2_handless.xml" />
-  <!-- <include file="h1_2.xml" /> -->
   <statistic center="1 0.7 1.5" extent="0.8" />
   <visual>
     <headlight diffuse="0.6 0.6 0.6" ambient="0.6 0.6 0.6" specular="0.9 0.9 0.9"/>

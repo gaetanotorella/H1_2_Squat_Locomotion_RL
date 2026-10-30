@@ -9,6 +9,7 @@ Reference: https://github.com/unitreerobotics/unitree_ros
 """
 
 import os
+from pathlib import Path
 
 import isaaclab.sim as sim_utils
 from isaaclab.actuators import IdealPDActuatorCfg, ImplicitActuatorCfg
@@ -19,6 +20,8 @@ from unitree_rl_lab.assets.robots import unitree_actuators
 
 UNITREE_MODEL_DIR = "path/to/unitree_model"  # Replace with the actual path to your unitree_model directory
 UNITREE_ROS_DIR = "/home/prisma-lab-ws/Scrivania/GaetanoTorella/unitree_ros"
+# Robot description shared with the MuJoCo simulator: <repo>/assets/h1_2 (override with H1_2_ASSETS_DIR).
+H1_2_ASSETS_DIR = os.environ.get("H1_2_ASSETS_DIR", str(Path(__file__).resolve().parents[6] / "assets" / "h1_2"))
 
 
 @configclass
@@ -299,7 +302,7 @@ UNITREE_H1_CFG = UnitreeArticulationCfg(
 # (deploy/robots/h1_2/config/config.yaml, FixStand). Effort/velocity limits from the URDF.
 UNITREE_H1_2_CFG = UnitreeArticulationCfg(
     spawn=UnitreeUrdfFileCfg(
-        asset_path=f"{UNITREE_ROS_DIR}/robots/h1_2_description/h1_2_handless.urdf",
+        asset_path=f"{H1_2_ASSETS_DIR}/h1_2_handless.urdf",
     ),
     init_state=ArticulationCfg.InitialStateCfg(
         pos=(0.0, 0.0, 1.0),
