@@ -1,16 +1,19 @@
-robot: "h1_2"  # Robot name, "go2", "b2", "b2w", "h1", "go2w", "g1"
-robot_scene: "scene.xml" # Robot scene, /unitree_robots/[robot]/scene.xml 
+robot: "h1_2"             # robot folder in assets/
+robot_scene: "scene.xml"  # scene file in assets/<robot>/
 
-domain_id: 0  # Domain id
-interface: "lo" # Interface 
+domain_id: 0              # DDS domain id
+interface: "lo"           # DDS network interface: lo for sim2sim on this PC
 
-use_joystick: 1 # Simulate Unitree WirelessController using a gamepad
-joystick_type: "xbox" # support "xbox" and "switch" gamepad layout
-joystick_device: "/dev/input/js0" # Device path
-joystick_bits: 16 # Some game controllers may only have 8-bit accuracy
+use_joystick: 1           # a gamepad acts as the Unitree wireless remote
+joystick_type: "xbox"     # "xbox" or "switch" layout ("script" is set by evaluation/run_protocol.py)
+joystick_device: "/dev/input/js0"
+joystick_bits: 16         # some gamepads only have 8-bit accuracy
 
-print_scene_information: 1 # Print link, joint and sensors information of robot
+print_scene_information: 1  # print links, joints and sensors of the robot
 
-enable_elastic_band: 1 # Virtual spring band, used for lifting h1
+enable_elastic_band: 1    # virtual spring holding the robot at start-up: key 9 toggles it, 7/8 shorten/lengthen it
 
-disturbance_script: "disturbances.yaml" # Spinte manuali da tastiera (src/push_disturbance.h); "" per disattivare
+disturbance_script: ""    # manual pushes bound to keys: "disturbances.yaml" to enable them (src/push_disturbance.h)
+
+log_ground_truth: 0       # 1 (or --log) writes the true base state to <log_dir>/sim_<timestamp>/ground_truth.csv
+log_dir: ""               # empty = <repo>/sim_logs

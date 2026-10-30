@@ -488,15 +488,15 @@ namespace
                   measured = true;
                 }
 
-                // Tempo di simulazione pubblicato per il joystick scriptato: e' l'asse su cui
-                // il protocollo di test viene riprodotto (vedi scripted_joystick.h).
+                // Simulation time published for the scripted joystick: the axis on which a test
+                // protocol is played (see scripted_joystick.h).
                 scripted::g_sim_time.store(d->time);
 
                 // elastic band on base link
                 if (param::config.enable_elastic_band == 1)
                 {
-                  // Rilascio automatico della corda: equivale al tasto 9 premuto a mano, ma a un
-                  // istante di simulazione esatto e ripetibile.
+                  // Automatic release of the elastic band: like pressing key 9 by hand, but at an exact
+                  // and repeatable simulation time.
                   const double rel = scripted::g_band_release_at.load();
                   if (rel >= 0.0 && elastic_band.enable_ && d->time >= rel)
                   {
@@ -504,7 +504,7 @@ namespace
                     d->xfrc_applied[param::config.band_attached_link + 0] = 0.0;
                     d->xfrc_applied[param::config.band_attached_link + 1] = 0.0;
                     d->xfrc_applied[param::config.band_attached_link + 2] = 0.0;
-                    std::cout << "[protocol] corda rilasciata a t=" << d->time << " s" << std::endl;
+                    std::cout << "[protocol] elastic band released at t=" << d->time << " s" << std::endl;
                   }
                   if (elastic_band.enable_)
                   {
@@ -519,7 +519,7 @@ namespace
                   }
                 }
 
-                // Spinte manuali: dopo la banda, prima di mj_step (vedi push_disturbance.h).
+                // Manual pushes: after the band, before mj_step (see push_disturbance.h).
                 if (!pushes::g_pushes.empty())
                   pushes::g_pushes.apply(m, d, sim_logger::g_run_dir,
                                          param::config.band_attached_link / 6,
@@ -541,7 +541,8 @@ namespace
             if (stepped)
             {
               sim.AddToHistory();
-              sim_logger::log_ground_truth(d); // ground-truth base -> unitree_ws/sim_logs/sim_<ts>/
+              if (param::config.log_ground_truth)
+                sim_logger::log_ground_truth(d);  // true base state -> <log_dir>/sim_<ts>/
             }
           }
 
@@ -617,10 +618,10 @@ void *UnitreeSdk2BridgeThread(void *arg)
   }
   param::config.band_attached_link = 6 * body_id;
 
-  // Spinte manuali da tastiera (test di robustezza): preset in `disturbance_script`, se indicato.
+  // Manual pushes from the keyboard (robustness tests): presets in `disturbance_script`, if set.
   if (!param::config.disturbance_script.empty()) {
     std::filesystem::path dp = param::config.disturbance_script;
-    if (dp.is_relative()) dp = std::filesystem::path(getExecutableDir()).parent_path() / dp;  // relativo a simulate/, come config.yaml
+    if (dp.is_relative()) dp = std::filesystem::path(getExecutableDir()).parent_path() / dp;  // relative to simulator/, like config.yaml
     pushes::g_pushes.load(dp.string(), m);
   }
   
@@ -666,7 +667,7 @@ void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
       mj_resetData(m, d);
       mj_forward(m, d);
     }
-    // spinte manuali: i tasti dei preset (GLFW usa il codice ASCII maiuscolo)
+    // manual pushes: the preset keys (GLFW uses the upper-case ASCII code)
     if(!pushes::g_pushes.empty() && d) {
       pushes::g_pushes.trigger(key, d->time);
     }
@@ -708,12 +709,12 @@ int main(int argc, char **argv)
   // Load simulation configuration
   std::filesystem::path proj_dir = std::filesystem::path(getExecutableDir()).parent_path();
   {
-    // --config <file> per la procedura di test automatizzata: nessuna riscrittura del config di
-    // produzione, quindi la sessione manuale col joystick fisico resta intatta comunque vada.
+    // --config <file>: used by evaluation/ to run with the scripted joystick without editing
+    // config.yaml, which stays the one of the manual sessions.
     std::string ovr = param::config_override(argc, argv);
     if (!ovr.empty()) {
       if (!std::filesystem::exists(ovr)) {
-        std::cerr << "Config file non trovato: " << ovr << std::endl;
+        std::cerr << "Config file not found: " << ovr << std::endl;
         return EXIT_FAILURE;
       }
       std::cout << "Config file (override): " << ovr << std::endl;
@@ -725,6 +726,13 @@ int main(int argc, char **argv)
   param::helper(argc, argv);
   if(param::config.robot_scene.is_relative()) {
     param::config.robot_scene = proj_dir.parent_path() / "assets" / param::config.robot / param::config.robot_scene;
+  }
+  {
+    // log folder: <repo>/sim_logs by default, the same default as the controller's --log
+    std::filesystem::path ld = param::config.log_dir.empty() ? proj_dir.parent_path() / "sim_logs"
+                                                             : std::filesystem::path(param::config.log_dir);
+    if (ld.is_relative()) ld = proj_dir / ld;
+    sim_logger::g_base_dir = ld.string();
   }
 
   // simulate object encapsulates the UI

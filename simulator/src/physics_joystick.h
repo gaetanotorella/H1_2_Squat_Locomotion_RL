@@ -37,11 +37,7 @@ public:
         right(js_->axis_[6] > 0);
         LT(js_->axis_[2] > 0);
         RT(js_->axis_[5] > 0);
-        // lx(double(js_->axis_[0]) / max_value_);
-        // ly(-double(js_->axis_[1]) / max_value_);
-        // rx(double(js_->axis_[3]) / max_value_);
-        // ry(-double(js_->axis_[4]) / max_value_);
-
+        // 0.15 deadzone: the gamepad drifts by about 0.1 at rest, which would be a phantom command
         auto dz = [](double v){ return (v < 0.15 && v > -0.15) ? 0.0 : v; };
         lx(dz( double(js_->axis_[0]) / max_value_));
         ly(dz(-double(js_->axis_[1]) / max_value_));

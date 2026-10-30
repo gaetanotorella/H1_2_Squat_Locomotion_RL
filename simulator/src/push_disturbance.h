@@ -1,34 +1,33 @@
 #pragma once
 //
-// Spinte MANUALI per il test di robustezza: forze e coppie applicate a un corpo del robot premendo
-// un TASTO nella finestra di MuJoCo, mentre si guida il robot col joystick fisico. Ogni tasto e' un
-// preset (corpo, forza/coppia, durata, punto, riferimento) definito in un file YAML indicato da
-// `disturbance_script:` in config.yaml. Nessun legame con il banco automatico o i protocolli.
+// MANUAL pushes for robustness tests: forces and torques applied to a body of the robot by pressing a
+// KEY in the MuJoCo window, while driving the robot with the physical joystick. Every key is a preset
+// (body, force/torque, duration, point, frame) defined in the YAML file given by
+// `disturbance_script:` in config.yaml. Independent of the automated protocols.
 //
 //   # disturbances.yaml
 //   presets:
-//     - {key: "1", body: torso_link, force: [100, 0, 0],  dur: 0.2}   # 20 N.s avanti
-//     - {key: "2", body: torso_link, force: [-100, 0, 0], dur: 0.2}   # 20 N.s indietro
-//     - {key: "3", body: torso_link, force: [0, 100, 0],  dur: 0.2}   # 20 N.s a sinistra
-//     - {key: "4", body: torso_link, force: [0, -100, 0], dur: 0.2}   # 20 N.s a destra
-//     - {key: "5", body: pelvis,     torque: [0, 0, 30],  dur: 0.2}   # coppia di imbardata
-//     - {key: "6", body: torso_link, force: [150, 0, 0],  dur: 0.2, point: [0, 0, 0.3]}  # 30 cm sopra l'origine
+//     - {key: "1", body: torso_link, force: [100, 0, 0],  dur: 0.2}   # 20 N.s forward
+//     - {key: "2", body: torso_link, force: [-100, 0, 0], dur: 0.2}   # 20 N.s backward
+//     - {key: "3", body: torso_link, force: [0, 100, 0],  dur: 0.2}   # 20 N.s to the left
+//     - {key: "4", body: torso_link, force: [0, -100, 0], dur: 0.2}   # 20 N.s to the right
+//     - {key: "5", body: pelvis,     torque: [0, 0, 30],  dur: 0.2}   # yaw torque
+//     - {key: "6", body: torso_link, force: [150, 0, 0],  dur: 0.2, point: [0, 0, 0.3]}  # 30 cm above the origin
 //
-//   force in N, torque in N.m, dur in secondi (0 = un solo passo fisico, 5 ms), point in metri nel
-//   riferimento del corpo (default: baricentro; un punto diverso aggiunge la coppia equivalente
-//   (P - CoM) x F). frame: "body" (DEFAULT: "avanti" e' l'avanti del robot, anche se ha girato) o
-//   "world". I tasti sono caratteri singoli; 7, 8, 9 sono gia' della corda elastica.
+//   force in N, torque in N.m, dur in seconds (0 = a single physics step, 5 ms), point in metres in
+//   the body frame (default: centre of mass; another point adds the equivalent torque (P - CoM) x F).
+//   frame: "body" (DEFAULT: "forward" is the robot's forward, even after it turned) or "world".
+//   Keys are single characters; 7, 8, 9 already belong to the elastic band.
 //
-// Meccanismo: mjData::xfrc_applied[6*body] = forza (3, mondo) + coppia (3, mondo) al baricentro.
-// ATTENZIONE: Simulate::Sync() (simulate.cc, thread di rendering, ~60 Hz) fa mju_zero su TUTTO
-// xfrc_applied a ogni frame, per ripulire le perturbazioni del mouse: qualunque cosa si voglia
-// applicare va RISCRITTA in valore assoluto a ogni passo fisico, come fa la banda elastica. Se il
-// corpo e' quello della banda, il valore appena scritto dalla banda (che agisce prima, nello
-// stesso passo) viene conservato e la spinta gli si somma.
+// Mechanism: mjData::xfrc_applied[6*body] = force (3, world) + torque (3, world) at the CoM.
+// CAUTION: Simulate::Sync() (simulate.cc, rendering thread, ~60 Hz) zeroes ALL of xfrc_applied at
+// every frame, to clear the mouse perturbations: anything to be applied must be REWRITTEN in absolute
+// value at every physics step, as the elastic band does. If the body is the band's, the value just
+// written by the band (which acts first, in the same step) is kept and the push is added to it.
 //
-// Ogni spinta applicata e' loggata in disturbance_events.csv nella cartella del run (start/end,
-// tempo di simulazione, corpo, forza, coppia, punto): tools/report_pushes.py la legge insieme a
-// ground_truth.csv e obs.csv per misurare la risposta (Dv, picco di tilt, spostamento, assestamento).
+// Every applied push is logged to disturbance_events.csv in the run folder (start/end, simulation
+// time, body, force, torque, point), when the ground-truth log is active: evaluation/report_pushes.py
+// reads it with ground_truth.csv and obs.csv to measure the response.
 //
 #include <mujoco/mujoco.h>
 #include <yaml-cpp/yaml.h>
@@ -59,26 +58,26 @@ public:
         bool started = false, finished = false;
     };
 
-    // Carica i preset da `path` (chiave `presets`). Ritorna false se manca o e' vuota.
+    // Loads the presets from `path` (key `presets`). Returns false if it is missing or empty.
     bool load(const std::string & path, const mjModel * m)
     {
         YAML::Node cfg;
         try { cfg = YAML::LoadFile(path); }
         catch (const std::exception & ex) {
-            std::cerr << "Spinte: impossibile leggere " << path << ": " << ex.what() << std::endl;
+            std::cerr << "Pushes: cannot read " << path << ": " << ex.what() << std::endl;
             return false;
         }
-        if (!cfg["presets"]) { std::cerr << "Spinte: nessuna chiave `presets` in " << path << std::endl; return false; }
+        if (!cfg["presets"]) { std::cerr << "Pushes: no `presets` key in " << path << std::endl; return false; }
 
-        std::cout << "Spinte manuali da " << path << " -- tasti nella finestra MuJoCo:" << std::endl;
+        std::cout << "Manual pushes from " << path << " -- keys in the MuJoCo window:" << std::endl;
         for (const auto & n : cfg["presets"])
         {
             Event e;
-            e.t1 = (n["dur"] ? n["dur"].as<double>() : 0.0);   // qui t1 = durata; t0 si fissa al trigger
+            e.t1 = (n["dur"] ? n["dur"].as<double>() : 0.0);   // here t1 = duration; t0 is set at trigger time
             e.body_name = n["body"] ? n["body"].as<std::string>() : "torso_link";
             e.body = mj_name2id(m, mjOBJ_BODY, e.body_name.c_str());
             if (e.body < 0) {
-                std::cerr << "Spinte: corpo '" << e.body_name << "' non esiste nel modello" << std::endl;
+                std::cerr << "Pushes: body '" << e.body_name << "' does not exist in the model" << std::endl;
                 std::exit(EXIT_FAILURE);
             }
             if (n["force"])  for (int i = 0; i < 3; i++) e.force[i]  = n["force"][i].as<double>();
@@ -86,13 +85,13 @@ public:
             if (n["point"])  { e.has_point = true; for (int i = 0; i < 3; i++) e.point[i] = n["point"][i].as<double>(); }
             e.body_frame = !(n["frame"] && n["frame"].as<std::string>() == "world");   // default: body
             const std::string key = n["key"].as<std::string>();
-            if (key.size() != 1) { std::cerr << "Spinte: `key` deve essere un carattere singolo (" << key << ")" << std::endl; std::exit(EXIT_FAILURE); }
+            if (key.size() != 1) { std::cerr << "Pushes: `key` must be a single character (" << key << ")" << std::endl; std::exit(EXIT_FAILURE); }
             presets_[std::toupper(key[0])] = e;
             std::cout << "   [" << key << "]  " << e.body_name
                       << "  F=(" << e.force[0] << "," << e.force[1] << "," << e.force[2] << ") N"
                       << "  T=(" << e.torque[0] << "," << e.torque[1] << "," << e.torque[2] << ") N.m"
                       << "  " << e.t1 << " s  " << (e.body_frame ? "body" : "world")
-                      << "  -> impulso " << std::sqrt(e.force[0]*e.force[0]+e.force[1]*e.force[1]+e.force[2]*e.force[2]) * std::max(e.t1, 0.005) << " N.s"
+                      << "  -> impulse " << std::sqrt(e.force[0]*e.force[0]+e.force[1]*e.force[1]+e.force[2]*e.force[2]) * std::max(e.t1, 0.005) << " N.s"
                       << std::endl;
         }
         return !presets_.empty();
@@ -100,28 +99,28 @@ public:
 
     bool empty() const { return presets_.empty(); }
 
-    // Da chiamare dal callback della tastiera: se `key` (GLFW, = codice ASCII maiuscolo) e' un
-    // preset, programma la spinta A PARTIRE DA ORA (tempo di simulazione corrente).
+    // Called from the keyboard callback: if `key` (GLFW, = upper-case ASCII code) is a preset, the push
+    // is scheduled FROM NOW (current simulation time).
     void trigger(int key, double now)
     {
         auto it = presets_.find(key);
         if (it == presets_.end()) return;
         Event e = it->second;
         e.t0 = now; e.t1 = now + it->second.t1;
-        {   // trigger() gira nel thread della finestra, apply() in quello della fisica
+        {   // trigger() runs in the window thread, apply() in the physics thread
             std::lock_guard<std::mutex> lk(mtx_);
             pending_.push_back(e);
         }
-        std::cout << "[spinta] tasto " << char(key) << " a t=" << now << " s: " << e.body_name << std::endl;
+        std::cout << "[push] key " << char(key) << " at t=" << now << " s: " << e.body_name << std::endl;
     }
 
-    // Da chiamare a OGNI passo fisico, prima di mj_step, DOPO la banda elastica.
-    // band_body: corpo su cui agisce la banda (-1 se nessuno); band_on: se in questo passo la
-    // banda ha appena scritto la sua forza su xfrc_applied[band_body].
+    // Called at EVERY physics step, before mj_step, AFTER the elastic band.
+    // band_body: body the band acts on (-1 if none); band_on: whether in this step the band has just
+    // written its force to xfrc_applied[band_body].
     void apply(const mjModel * m, mjData * d, const std::string & log_dir, int band_body = -1, bool band_on = false)
     {
         std::map<int, std::array<double, 6>> acc_by_body;
-        {   // prendi in carico le spinte richieste da tastiera
+        {   // take over the pushes requested from the keyboard
             std::lock_guard<std::mutex> lk(mtx_);
             for (auto & e : pending_) events_.push_back(e);
             pending_.clear();
@@ -130,19 +129,19 @@ public:
         const double t = d->time;
         for (auto & e : events_)
         {
-            const bool active = (t >= e.t0) && (t < e.t1 || (!e.started && e.t1 <= e.t0));  // dur 0 -> un passo
+            const bool active = (t >= e.t0) && (t < e.t1 || (!e.started && e.t1 <= e.t0));  // dur 0 -> one step
             if (!active) {
                 if (e.started && !e.finished && t >= e.t1) { e.finished = true; log(e, "end", t, log_dir); }
                 continue;
             }
             if (!e.started) { e.started = true; log(e, "start", t, log_dir); }
-            if (e.t1 <= e.t0) e.finished = true;  // impulsivo: si spegne da solo al passo dopo
+            if (e.t1 <= e.t0) e.finished = true;  // impulsive: switches off by itself at the next step
 
-            // forza e coppia nel riferimento MONDO
+            // force and torque in the WORLD frame
             std::array<double, 3> F = e.force, T = e.torque;
             if (e.body_frame) { F = rot(d->xmat + 9 * e.body, e.force); T = rot(d->xmat + 9 * e.body, e.torque); }
 
-            // punto di applicazione diverso dal baricentro -> coppia equivalente (P - CoM) x F
+            // application point other than the CoM -> equivalent torque (P - CoM) x F
             if (e.has_point)
             {
                 const std::array<double, 3> pl = rot(d->xmat + 9 * e.body, e.point);
@@ -157,18 +156,18 @@ public:
             for (int i = 0; i < 3; i++) { acc[i] += F[i]; acc[3 + i] += T[i]; }
         }
 
-        // scrittura ASSOLUTA per ogni corpo toccato in questo passo
+        // ABSOLUTE write for every body touched in this step
         for (auto & kv : acc_by_body)
         {
             mjtNum * x = d->xfrc_applied + 6 * kv.first;
             const bool keep_band = (kv.first == band_body) && band_on;
             for (int i = 0; i < 6; i++)
-                if (!(keep_band && i < 3)) x[i] = 0.0;      // la forza della banda resta, il resto riparte da 0
+                if (!(keep_band && i < 3)) x[i] = 0.0;      // the band's force stays, the rest restarts from 0
             for (int i = 0; i < 6; i++) x[i] += kv.second[i];
         }
-        // i corpi che avevano un disturbo al passo scorso e ora no: Sync() li azzera a ogni frame,
-        // ma fra due frame ci sono piu' passi fisici -> azzeriamo noi subito, per non lasciare
-        // la forza appesa un passo in piu'.
+        // bodies pushed at the previous step but not now: Sync() zeroes them at every frame, but
+        // there are several physics steps between two frames, so they are zeroed here right away
+        // to avoid leaving the force on for an extra step.
         for (int b : touched_)
             if (!acc_by_body.count(b) && b != band_body)
                 for (int i = 0; i < 6; i++) d->xfrc_applied[6 * b + i] = 0.0;

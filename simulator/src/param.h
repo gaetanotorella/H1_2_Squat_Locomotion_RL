@@ -20,12 +20,16 @@ inline struct SimulationConfig
     std::string joystick_type;
     std::string joystick_device;
     int joystick_bits;
-    // joystick_type: "script" -> il joystick e' riprodotto da questo file YAML invece che letto
-    // da /dev/input/js*. Vedi scripted_joystick.h e tools/run_protocol.py.
+    // joystick_type "script": the joystick is played from this YAML file instead of being read from
+    // /dev/input/js*. See scripted_joystick.h and evaluation/run_protocol.py.
     std::string joystick_script;
-    // File YAML con la chiave `presets:`: spinte manuali legate a tasti della finestra MuJoCo
-    // (vedi push_disturbance.h). Vuoto = disattivato.
+    // YAML file with a `presets:` key: manual pushes bound to keys of the MuJoCo window
+    // (see push_disturbance.h). Empty = disabled.
     std::string disturbance_script;
+    // Ground-truth log (state_logger.h): 1 writes the true base state to <log_dir>/sim_<timestamp>/
+    // (also enabled with --log). Empty log_dir = <repo>/sim_logs; a relative path is relative to simulator/.
+    int log_ground_truth = 0;
+    std::string log_dir;
 
     int print_scene_information;
 
@@ -47,6 +51,8 @@ inline struct SimulationConfig
             joystick_bits = cfg["joystick_bits"].as<int>();
             joystick_script = cfg["joystick_script"] ? cfg["joystick_script"].as<std::string>() : "";
             disturbance_script = cfg["disturbance_script"] ? cfg["disturbance_script"].as<std::string>() : "";
+            log_ground_truth = cfg["log_ground_truth"] ? cfg["log_ground_truth"].as<int>() : 0;
+            log_dir = cfg["log_dir"] ? cfg["log_dir"].as<std::string>() : "";
             print_scene_information = cfg["print_scene_information"].as<int>();
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
         }
@@ -61,13 +67,10 @@ inline struct SimulationConfig
 /* ---------- Command Line Parameters ---------- */
 namespace po = boost::program_options;
 
-// Pre-scansione di argv per --config/-c PRIMA di load_from_yaml.
-// Non si puo' usare boost::program_options qui: helper() scrive direttamente dentro `config`
-// tramite po::value<...>(&config.x), quindi deve girare DOPO il caricamento del file, altrimenti
-// il file sovrascriverebbe i valori passati da riga di comando. Da cui questa scansione a mano.
-//
-// PERCHE' ESISTE: la procedura di test automatizzata deve poter usare un config con il joystick
-// scriptato senza riscrivere quello di produzione, che e' lo stesso usato per le sessioni manuali.
+// Scans argv for --config/-c BEFORE load_from_yaml. boost::program_options cannot be used here:
+// helper() writes directly into `config` through po::value<...>(&config.x), so it must run AFTER the
+// file is loaded, otherwise the file would overwrite the command line values. evaluation/ uses
+// --config to run with the scripted joystick without editing config.yaml.
 inline std::string config_override(int argc, char** argv)
 {
     for(int i = 1; i < argc; ++i)
@@ -89,12 +92,15 @@ inline po::variables_map helper(int argc, char** argv)
         ("network,n", po::value<std::string>(&config.interface), "DDS network interface; -n eth0")
         ("robot,r", po::value<std::string>(&config.robot), "Robot type; -r go2")
         ("scene,s", po::value<std::filesystem::path>(&config.robot_scene), "Robot scene file; -s scene_terrain.xml")
-        ("config,c", po::value<std::string>(), "config.yaml alternativo; gia' letto prima di qui")
+        ("config,c", po::value<std::string>(), "alternative config.yaml (read before the other options)")
+        ("log", "record the ground-truth base state (same as log_ground_truth: 1)")
+        ("log-dir", po::value<std::string>(&config.log_dir), "folder of the logs (default: <repo>/sim_logs)")
     ;
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
+    if (vm.count("log")) config.log_ground_truth = 1;
     
     if (vm.count("help"))
     {
