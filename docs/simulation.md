@@ -22,7 +22,7 @@ Sequence:
 2. `LT + up` on the gamepad: FixStand, the robot moves to the default pose in 3 s;
 3. `RB + X`: the policy starts;
 4. key `9` in the MuJoCo window: releases the band, the robot stands on its own;
-5. drive it: sticks for velocity, `R2` / `A + R2` / `B` for the height (see
+5. drive it: sticks for velocity, `RT` / `A + RT` / `B` for the height (see
    [Controller § Gamepad](controller.md#gamepad-in-the-squat-state));
 6. `LT + B`: back to Passive.
 

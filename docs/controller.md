@@ -50,7 +50,7 @@ The FSM ticks at **1 kHz**: at every tick the current state writes the motor com
 | **FixStand** | interpolates in 3 s from the current pose to the default pose, FixStand kp/kd | `LT + up` (Passive) |
 | **Squat** (RL) | runs the policy | `RB + X` (FixStand) |
 
-On the Unitree remote LT is L2 and RB is R1. Two safety checks send the robot back to Passive by
+On the Unitree remote LT is L2, RB is R1 and RT is R2. Two safety checks send the robot back to Passive by
 themselves:
 
 - **tilt**: the angle between the base z axis and the vertical exceeds 1 rad (in the RL state);
@@ -65,8 +65,8 @@ The log tells which one fired (`FSM: Change state from Squat to Passive (joystic
 |---|---|
 | left stick | forward/backward (vx) and lateral (vy) velocity |
 | right stick, horizontal | turn (wz) |
-| `R2` held | lower the height target at 0.05 m/s; it **stops at 0.71 m**, the lowest walking height |
-| `A + R2` held | go further down, to 0.60 m |
+| `RT` held | lower the height target at 0.05 m/s; it **stops at 0.71 m**, the lowest walking height |
+| `A + RT` held | go further down, to 0.60 m |
 | `B` held | raise the height target at 0.05 m/s, up to 0.98 m |
 
 The commanded height is printed in the terminal (`Squat: height 0.843 m`), with a message when the
@@ -87,7 +87,7 @@ Every **20 ms** (50 Hz, `step_dt` in `deploy.yaml`), in a dedicated thread:
      (vx [−0.3, 1.0], vy [−0.3, 0.3], wz [−0.5, 0.5]), then **zeroed below `cutoff_height`
      (0.70 m)**;
    - `gait_phase`: a 0.8 s clock, output (0, 0) when the command norm is below 0.1, as in training;
-   - `base_height_command`: the height target driven by R2/A/B, minus 0.98;
+   - `base_height_command`: the height target driven by RT/A/B, minus 0.98;
    - `last_action`: the previous raw action.
 3. **History**: each term keeps its last 5 values; the input vector is the per-term concatenation
    (oldest to newest), 465 values, exactly the Isaac Lab layout.

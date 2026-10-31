@@ -6,7 +6,9 @@ crouched down to 0.70 m. The policy is trained in Isaac Lab, validated sim-to-si
 deployed on the real robot with the same C++ controller.
 
 This repository contains everything needed to reproduce the work of the master's thesis
-*(title, author, university: to be added)*:
+**Sim-to-Real Transfer of Reinforcement Learning Policies for Humanoid Robots** (Gaetano Torella,
+University of Naples Federico II, Department of Electrical Engineering and Information Technology
+(DIETI), PRISMA Lab, 2026):
 
 | folder | content |
 |---|---|
@@ -16,7 +18,7 @@ This repository contains everything needed to reproduce the work of the master's
 | [`simulator/`](simulator) | MuJoCo simulator speaking the robot's DDS interface, for sim2sim |
 | [`evaluation/`](evaluation) | automated sim2sim test protocols, metrics, run comparison, replay of real experiments |
 | [`assets/h1_2/`](assets/h1_2) | robot description shared by training (URDF) and simulator (MJCF) |
-| [`docs/`](docs) | the documentation (also published as the GitHub Wiki) |
+| [`docs/`](docs) | the documentation (also published as the [GitHub Wiki](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki)) |
 
 ## Documentation
 
@@ -28,6 +30,8 @@ This repository contains everything needed to reproduce the work of the master's
 6. [Evaluation](docs/evaluation.md): automated protocols, metrics, comparison, replay of real experiments
 7. [Real robot](docs/real_robot.md): deployment on the H1_2 with Docker, operating procedure
 8. [Results](docs/results.md): images and videos of the thesis
+
+The pages are written in `docs/`; the Wiki is a copy made with `scripts/publish_wiki.py`.
 
 ## Quick start (sim2sim)
 
@@ -65,7 +69,19 @@ This repository merges and extends:
 - [unitreerobotics/unitree_ros](https://github.com/unitreerobotics/unitree_ros) (BSD-3-Clause): the H1_2 URDF and meshes.
 
 See [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) for what comes from where and how it was
-modified. The history of the work during the thesis, including the analysis tools used for its
-figures, is in the archived repositories
-[Squat_Unitree_H1_2](https://github.com/gaetanotorella/Squat_Unitree_H1_2) and
-[unitree_mujoco](https://github.com/gaetanotorella/unitree_mujoco) (tag `thesis-final`).
+modified. The first commit of this repository holds the files kept here exactly as they were at the
+end of the thesis; the development history before it, and the tools used to draw the figures of the
+thesis, are kept in private archive repositories.
+
+## Citation
+
+```bibtex
+@mastersthesis{torella2026simtoreal,
+  author = {Torella, Gaetano},
+  title  = {Sim-to-Real Transfer of Reinforcement Learning Policies for Humanoid Robots},
+  school = {University of Naples Federico II, Department of Electrical Engineering and Information Technology (DIETI)},
+  note   = {PRISMA Lab},
+  year   = {2026},
+  url    = {https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL}
+}
+```
