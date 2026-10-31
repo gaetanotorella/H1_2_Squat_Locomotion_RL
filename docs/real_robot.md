@@ -50,7 +50,9 @@ Safety rope or crane attached for the first tests: in the thesis, the robot was 
 with the rope kept slack while the policy was active, and only once the policy was validated it was
 also run without any safety apparatus.
 
-![Experimental setup](media/real_setup.jpg)
+| <img src="media/setup_crane.jpg" width="400" alt="Robot secured to the crane"> | <img src="media/setup_free.jpg" width="400" alt="Robot without safety apparatus"> |
+|:---:|:---:|
+| Secured to the crane, rope slack | Without the safety apparatus |
 
 ```bash
 cd ~/H1_2_Squat_Locomotion_RL

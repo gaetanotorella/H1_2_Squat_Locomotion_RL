@@ -8,7 +8,9 @@ still and **squat** on command, from the upright height (0.98 m) down to 0.60 m,
 crouched down to 0.70 m. The policy is trained in Isaac Lab, validated sim-to-sim in MuJoCo and
 deployed on the real robot with the same C++ controller.
 
-![The same scene in the three stages](docs/media/pipeline.jpg)
+| <img src="docs/media/stage_isaac.jpg" width="280" alt="Isaac Lab"> | <img src="docs/media/stage_mujoco.jpg" width="280" alt="MuJoCo"> | <img src="docs/media/setup_free.jpg" width="280" alt="Unitree H1_2"> |
+|:---:|:---:|:---:|
+| Training in Isaac Lab | Sim-to-sim in MuJoCo | The real Unitree H1_2 |
 
 This repository contains everything needed to reproduce the work of the master's thesis
 **Sim-to-Real Transfer of Reinforcement Learning Policies for Humanoid Robots** (Gaetano Torella,

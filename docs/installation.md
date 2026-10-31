@@ -1,9 +1,14 @@
 # Installation
 
-Two machines are involved:
+Two roles are involved:
 
 - a **development PC** (Ubuntu 22.04, x86_64) for the simulator, the controller and the evaluation;
-- a **training PC** with an NVIDIA GPU for Isaac Lab (it can be the same machine).
+- a **training PC** with an NVIDIA GPU for Isaac Lab.
+
+In the thesis they were two machines: training ran on a GPU server, everything else on a laptop,
+which was also the one connected to the robot. Two machines are not required: a laptop powerful
+enough to train with Isaac Lab (see the requirements in [§ 6](#6-isaac-lab-training-pc)) can do
+everything, with all the steps below on the same machine.
 
 The robot's onboard PC runs the controller in Docker, see [Real robot](real_robot.md).
 

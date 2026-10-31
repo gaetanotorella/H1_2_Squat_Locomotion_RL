@@ -66,7 +66,9 @@ A run with this repository gives the same gains within ±0.03.
 
 ## 3. On the physical robot
 
-![Experimental setup](media/real_setup.jpg)
+| <img src="media/setup_crane.jpg" width="400" alt="Robot secured to the crane"> | <img src="media/setup_free.jpg" width="400" alt="Robot without safety apparatus"> |
+|:---:|:---:|
+| Secured to the crane, rope slack | Without the safety apparatus |
 
 The controller runs in its Docker container on the robot's onboard PC, the same binary as in
 simulation. The robot hangs from a crane with the rope kept slack while the policy is active; in the
@@ -94,10 +96,13 @@ https://github.com/user-attachments/assets/9ba5a2b7-e4da-422e-9b48-ba59747ec99e
 *Session 3: the physical robot, its MuJoCo replay, and the height h and torso pitch θ of both, with
 their difference.*
 
-![Squat descent](media/squat_sequence.jpg)
+| <img src="media/squat/real_098.jpg" width="150" alt="robot at 0.98 m"> | <img src="media/squat/real_090.jpg" width="150" alt="robot at 0.90 m"> | <img src="media/squat/real_079.jpg" width="150" alt="robot at 0.79 m"> | <img src="media/squat/real_070.jpg" width="150" alt="robot at 0.70 m"> | <img src="media/squat/real_061.jpg" width="150" alt="robot at 0.61 m"> |
+|:---:|:---:|:---:|:---:|:---:|
+| <img src="media/squat/sim_098.jpg" width="150" alt="replay at 0.98 m"> | <img src="media/squat/sim_090.jpg" width="150" alt="replay at 0.90 m"> | <img src="media/squat/sim_079.jpg" width="150" alt="replay at 0.79 m"> | <img src="media/squat/sim_070.jpg" width="150" alt="replay at 0.70 m"> | <img src="media/squat/sim_061.jpg" width="150" alt="replay at 0.61 m"> |
+| 0.98 m | 0.90 m | 0.79 m | 0.70 m | 0.61 m |
 
-*The descent of session 3, physical robot (top) and MuJoCo replay (bottom) at the same instants,
-labelled with the commanded height.*
+*The descent of session 3: physical robot (first row) and MuJoCo replay (second row) at the same
+instants, with the commanded height.*
 
 In session 5 the base settles at 0.981 m when standing and reaches 0.619 m at the lower end of the
 height range: 0.36 m of excursion, 3.6 times the range of the factory controller. Unlike the factory
