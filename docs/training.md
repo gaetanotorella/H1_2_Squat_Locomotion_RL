@@ -4,7 +4,7 @@ Requires the Isaac Lab environment of [Installation § 6](installation.md#6-isaa
 The commands run from `training/`; runs are written to `training/logs/rsl_rl/unitree_h1_2_squat/<date_time>/`
 (ignored by git).
 
-<p align="center"><img src="media/isaac_training.gif" width="100%" alt="Parallel training environments in Isaac Lab"></p>
+<p align="center"><img src="media/isaac_training.webp" width="100%" alt="Parallel training environments in Isaac Lab"></p>
 
 *The final policy in the 4096 parallel environments, with robots commanded to different heights and
 velocities (2× speed).*

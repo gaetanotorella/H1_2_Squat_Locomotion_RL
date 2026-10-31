@@ -24,7 +24,7 @@ TREE = "https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/tree/main/"
 RAW = "https://raw.githubusercontent.com/gaetanotorella/H1_2_Squat_Locomotion_RL/main/"
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 SRC = re.compile(r'src="([^"]+)"')
-MEDIA = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".mp4")
+MEDIA = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".mp4")
 
 
 def page_name(md: Path) -> str:
