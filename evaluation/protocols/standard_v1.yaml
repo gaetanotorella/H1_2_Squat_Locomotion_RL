@@ -1,0 +1,82 @@
+# ============================================================================================
+# STANDARD TEST PROTOCOL v1 — H1_2 squat (the protocol of the thesis results: Table 11, Figure 16)
+#
+# Plays automatically the session that used to be done by hand, so that two policies receive
+# IDENTICAL commands at the same instants and their numbers can be compared.
+#
+# RULE: this file is never modified to suit a policy. A new manoeuvre goes in a new version, and the
+# report states which version was used; comparisons are valid only between runs of the same protocol.
+#
+# Sections: A) standing with zero command; B) standing, the six velocity axes; C) height ladder
+# 0.85, 0.74, 0.66, 0.60 m without returning to 0.98, 22 s at the bottom; D) the six axes at 0.74 m;
+# E) back up and final standing.
+#
+# No `stop_height`: the protocol predates the controller stop at 0.71 m, so the scripted joystick
+# holds A together with RT on every descent and the stop never intervenes.
+#
+# Semantics: every entry has a time `t` (SIMULATION time, s) and a STICKY state — vx/vy/wz/height hold
+# until a later entry changes them. `do` is a pulse instead. vx, vy in m/s; wz in rad/s; height in m.
+# Amplitudes at the ends of the training ranges (vx in [-0.3, 1.0], vy in [-0.3, 0.3], wz in [-0.5, 0.5]).
+# ============================================================================================
+name: standard_v1
+nominal_height: 0.98
+deepest_height: 0.60
+# ramps of the CONTROLLER's height target (observations.h): the scripted joystick uses them to know
+# how long to hold RT/B. If the controller changes, change them here too.
+descend_rate: 0.05
+rise_rate: 0.05
+band_release_at: 12.0
+stop_at: 262.0
+
+timeline:
+  # ---- start-up ------------------------------------------------------------------------
+  - {t:   2.0, do: fixstand}          # LT + up      (3 s ramp to the default pose)
+  - {t:   8.0, do: rl}                # RB + X       (policy start)
+  # the elastic band is released at t = 12.0 (band_release_at)
+  - {t:  14.0, vx: 0.0, vy: 0.0, wz: 0.0}
+
+  # ---- A) standing, zero command: reference for sway and lean ---------------------------
+  - {t:  14.0}                        # 10 s still
+
+  # ---- B) standing, the six axes, 9 s each with 4 s back at zero --------------------------
+  - {t:  24.0, vx:  1.0}
+  - {t:  33.0, vx:  0.0}
+  - {t:  37.0, vx: -0.3}
+  - {t:  46.0, vx:  0.0}
+  - {t:  50.0, vy:  0.3}
+  - {t:  59.0, vy:  0.0}
+  - {t:  63.0, vy: -0.3}
+  - {t:  72.0, vy:  0.0}
+  - {t:  76.0, wz:  0.5}
+  - {t:  85.0, wz:  0.0}
+  - {t:  89.0, wz: -0.5}
+  - {t:  98.0, wz:  0.0}
+
+  # ---- C) height ladder in place: tracking, lean, ankle torque ---------------------------
+  - {t: 102.0, height: 0.85}
+  - {t: 110.0, height: 0.74}
+  - {t: 118.0, height: 0.66}
+  - {t: 126.0, height: 0.60}
+  - {t: 148.0, height: 0.98}          # 22 s at the bottom: the long hold
+  # The protocol was written for a faster height ramp: at 0.05 m/s the rise to 0.98 takes 7.6 s and
+  # is still under way at t = 156, so report_metrics.py flags the segment t = 148, which is not part
+  # of the thesis metrics.
+
+  # ---- D) half squat at 0.74 m, the same six axes -----------------------------------------
+  - {t: 156.0, height: 0.74}
+  - {t: 162.0, vx:  1.0}
+  - {t: 171.0, vx:  0.0}
+  - {t: 175.0, vx: -0.3}
+  - {t: 184.0, vx:  0.0}
+  - {t: 188.0, vy:  0.3}
+  - {t: 197.0, vy:  0.0}
+  - {t: 201.0, vy: -0.3}
+  - {t: 210.0, vy:  0.0}
+  - {t: 214.0, wz:  0.5}
+  - {t: 223.0, wz:  0.0}
+  - {t: 227.0, wz: -0.5}
+  - {t: 236.0, wz:  0.0}
+
+  # ---- E) back up and final standing ------------------------------------------------------
+  - {t: 240.0, height: 0.98}
+  - {t: 250.0}

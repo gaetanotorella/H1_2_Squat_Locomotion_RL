@@ -1,5 +1,9 @@
 # ============================================================================================
-# STANDARD TEST PROTOCOL v3 — H1_2 squat (the protocol used for the thesis results)
+# STANDARD TEST PROTOCOL v3 — H1_2 squat (written after the thesis, for the controller stop at 0.71 m)
+#
+# Same manoeuvres as the thesis protocol (standard_v1.yaml), with two differences: the height ladder
+# of section C restarts from 0.98 every time, and section D is at the lowest walking height 0.71 m,
+# the controller stop, the height to use in the tests on the real robot.
 #
 # Sections: A) standing with zero command; B) standing, the six velocity axes; C) height ladder from
 # standing, back to 0.98 every time; D) the six axes at the lowest walking height 0.71 m;
