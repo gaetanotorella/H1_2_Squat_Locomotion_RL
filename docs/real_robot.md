@@ -46,7 +46,11 @@ robot.
 `rt/lowcmd`). Otherwise the controller prints `The other process is using the lowcmd channel` and
 two controllers would drive the motors: stop the container, enter debug mode, start again.
 
-Safety rope or crane attached for the first tests.
+Safety rope or crane attached for the first tests: in the thesis, the robot was secured to a crane
+with the rope kept slack while the policy was active, and only once the policy was validated it was
+also run without any safety apparatus.
+
+![Experimental setup](media/real_setup.jpg)
 
 ```bash
 cd ~/H1_2_Squat_Locomotion_RL

@@ -17,7 +17,7 @@ python3 -m venv .venv && .venv/bin/pip install -r evaluation/requirements.txt   
 | `analyze_sim.py` | plots and summary of any run, sim2sim or real robot |
 | `report_pushes.py` | response to the manual pushes of a sim2sim session |
 | `replay_experiment.py` | replays a real-robot experiment in MuJoCo with the same commands |
-| `protocols/` | `standard_v3.yaml` (the thesis protocol, 306 s) and `smoke.yaml` (40 s chain check) |
+| `protocols/` | `standard_v1.yaml` (the thesis protocol, 262 s), `standard_v3.yaml` (306 s, with the 0.71 m stop) and `smoke.yaml` (40 s chain check) |
 
 ## How a protocol is played
 
@@ -29,7 +29,8 @@ different machines command the same things at the same physical instants.
 
 `run_protocol.py`:
 
-1. checks that the protocol's `stop_height` equals `cutoff_height + 0.01` of the policy under test;
+1. checks that the protocol's `stop_height`, if declared, equals `cutoff_height + 0.01` of the
+   policy under test;
 2. writes two throwaway configs (scripted joystick, logging on, policy under test) and passes them
    with `--config`: the real `config.yaml` files are never touched, in particular the controller's,
    which is the one used on the robot;
@@ -44,24 +45,36 @@ python evaluation/run_protocol.py [--protocol protocols/standard_v3.yaml] [--pol
 The run folder `sim_logs/sim_<timestamp>/` then holds `protocol.yaml`, `run_meta.json`,
 `metrics.json`, `report.md`, `plots/`, `controller.log`, `simulator.log` and the CSV logs.
 
-## The standard protocol
+## The standard protocols
 
-`protocols/standard_v3.yaml`, 306 s:
+`protocols/standard_v1.yaml`, 262 s, is the protocol of the thesis results
+([Results § Sim-to-sim](results.md#2-sim-to-sim-in-mujoco)):
 
 | section | time [s] | content |
 |---|---|---|
 | start | 2–14 | FixStand, RL, band released at 12 s |
 | A | 14–24 | standing, zero command (reference sway) |
-| B | 24–98 | standing height, the six axes one at a time: vx +1.0 / −0.3, vy ±0.3, wz ±0.5 (9 s each) |
-| C | 102–186 | height ladder from standing: 0.85, 0.74, 0.66, 0.60 m, back to 0.98 each time (0.60 held for 24 s) |
-| D | 198–280 | the six axes again at **0.71 m**, the lowest walking height |
-| E | 284–306 | back to 0.98 m, standing |
+| B | 24–98 | standing height, the six axes one at a time: vx +1.0 / −0.3, vy ±0.3, wz ±0.5 (9 s each, 4 s at zero between them) |
+| C | 102–156 | height ladder in place: 0.85, 0.74, 0.66, 0.60 m (0.60 held for 22 s), back to 0.98 |
+| D | 156–236 | down to **0.74 m**, then the six axes again |
+| E | 240–262 | back to 0.98 m, standing |
+
+![The standard protocol v1 on the final policy](media/protocol.png)
+
+*The final policy on `standard_v1`: commands (dotted) and velocities and height measured in MuJoCo,
+from the activation of the policy.*
+
+`protocols/standard_v3.yaml`, 306 s, was written after the thesis for the controller stop at 0.71 m:
+same manoeuvres, but the ladder of section C restarts from 0.98 every time, and section D is at
+**0.71 m**, the lowest walking height. It declares `stop_height: 0.71`, so it also exercises the
+stop (RT alone down to 0.71, A + RT below). It is the default of `run_protocol.py`.
 
 A protocol is a YAML timeline: every entry has a time `t` and a **sticky** state (`vx`, `vy`, `wz`,
 `height` hold until changed), `do: fixstand | rl` are pulses. The joystick model ramps the height
-exactly like the controller (`descend_rate`, `rise_rate` = 0.05 m/s), uses RT down to the stop and
-A + RT below it, and holds the button for `overhold` seconds on arrival, so that the controller's
-target lands exactly on the requested height.
+exactly like the controller (`descend_rate`, `rise_rate` = 0.05 m/s) and holds the button for
+`overhold` seconds on arrival, so that the controller's target lands exactly on the requested
+height. With `stop_height` it uses RT down to the stop and A + RT below it; without it (protocols
+written before the stop, replays of older experiments) it holds A together with RT on every descent.
 
 ## Metrics
 
@@ -107,6 +120,12 @@ observations, with a summary on screen. It also works on real-robot runs (`exp_*
 the tilt then comes from the IMU and the height is **estimated by forward kinematics** from joint
 encoders and IMU (bias +0.3 cm, std 0.2 cm against the simulation ground truth), using the MuJoCo
 model in `assets/h1_2/`.
+
+<p align="center"><img src="media/height_estimation.png" width="560" alt="Height estimation by forward kinematics"></p>
+
+*Height of the base on the real robot: the model is placed in the measured joint configuration,
+tilted by the roll and pitch of the IMU, and the height is the vertical distance from the base to the
+lowest vertex of the feet.*
 
 ## Manual pushes
 

@@ -6,6 +6,12 @@ project. It publishes `rt/lowstate` and subscribes to `rt/lowcmd` exactly like t
 controller runs unchanged: a policy that works here has passed a full sim-to-sim transfer (Isaac
 Sim/PhysX to MuJoCo) with the real deployment code.
 
+![The H1_2 in the MuJoCo simulator](media/mujoco.jpg)
+
+*The simulator with the final policy running, just after the release of the elastic band: on the
+left MuJoCo's own panels (simulation, physics, rendering options), on the right the joint and
+actuator panels.*
+
 ## Run
 
 You need a gamepad (Xbox layout, e.g. Logitech F710 in X mode or a wired Xbox 360 pad) on

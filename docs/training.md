@@ -4,6 +4,10 @@ Requires the Isaac Lab environment of [Installation § 6](installation.md#6-isaa
 The commands run from `training/`; runs are written to `training/logs/rsl_rl/unitree_h1_2_squat/<date_time>/`
 (ignored by git).
 
+![Parallel training environments in Isaac Lab](media/isaac_envs.jpg)
+
+*Part of the 4096 parallel environments, with robots commanded to different heights and velocities.*
+
 ## Train
 
 ```bash
@@ -82,3 +86,12 @@ python scripts/rsl_rl/train.py --task Unitree-H1_2-Squat --headless --resume \
 
 `params/env.yaml` is kept exactly as recorded, so it still contains the URDF path of the training
 machine of the time.
+
+Its training, a single run of about 2 hours, is a reference for what a healthy run looks like in
+TensorBoard:
+
+![Training curves of the final policy](media/training_curves.png)
+
+*Top: mean episode reward and episode length (20 s = no falls). Bottom: the two curricula, the lower
+end ℓ<sub>h</sub> of the height command, which goes from 0.98 to 0.60 m, and the upper end u<sub>x</sub>
+of the forward velocity, which goes from 0.1 to 1.0 m/s; both are complete by iteration ~1300.*

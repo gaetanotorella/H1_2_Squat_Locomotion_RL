@@ -1,9 +1,14 @@
 # H1_2 Squat Locomotion RL
 
+<p align="center"><img src="docs/media/squat.gif" width="480" alt="Squat on the physical H1_2 and in its MuJoCo replay"></p>
+<p align="center"><em>Squat on the physical H1_2 (left) and in its MuJoCo replay with the same commands (right), 2× speed.</em></p>
+
 A single reinforcement-learning policy that makes the **Unitree H1_2** humanoid walk, turn, stand
 still and **squat** on command, from the upright height (0.98 m) down to 0.60 m, and walk while
 crouched down to 0.70 m. The policy is trained in Isaac Lab, validated sim-to-sim in MuJoCo and
 deployed on the real robot with the same C++ controller.
+
+![The same scene in the three stages](docs/media/pipeline.jpg)
 
 This repository contains everything needed to reproduce the work of the master's thesis
 **Sim-to-Real Transfer of Reinforcement Learning Policies for Humanoid Robots** (Gaetano Torella,
@@ -19,6 +24,18 @@ University of Naples Federico II, Department of Electrical Engineering and Infor
 | [`evaluation/`](evaluation) | automated sim2sim test protocols, metrics, run comparison, replay of real experiments |
 | [`assets/h1_2/`](assets/h1_2) | robot description shared by training (URDF) and simulator (MJCF) |
 | [`docs/`](docs) | the documentation (also published as the [GitHub Wiki](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki)) |
+
+## Results
+
+On the physical robot, with the policy trained in simulation and no fine-tuning:
+
+- **deep squat**: the base goes down by 0.36 m, 3.6 times the range of the factory controller, with
+  the same posture as in simulation within about 1°;
+- **locomotion while crouched**: walking, side-stepping and turning at 0.81 m, walking forwards at
+  0.71 m;
+- **push recovery**: 7 pushes out of 7 absorbed while standing, in at most 0.72 s, no falls.
+
+Videos, plots and the comparison with simulation: [Results](docs/results.md).
 
 ## Documentation
 

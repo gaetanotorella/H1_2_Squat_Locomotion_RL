@@ -21,7 +21,10 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 TREE = "https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/tree/main/"
+RAW = "https://raw.githubusercontent.com/gaetanotorella/H1_2_Squat_Locomotion_RL/main/"
 LINK = re.compile(r"\]\(([^)\s]+)\)")
+SRC = re.compile(r'src="([^"]+)"')
+MEDIA = (".png", ".jpg", ".jpeg", ".gif", ".svg", ".mp4")
 
 
 def page_name(md: Path) -> str:
@@ -29,20 +32,25 @@ def page_name(md: Path) -> str:
     return md.stem.replace("_", "-").capitalize()
 
 
+def rewrite_target(target: str, folder: Path) -> str:
+    """A relative link of a Markdown file in `folder`, as seen from the Wiki."""
+    if re.match(r"[a-z]+:", target) or target.startswith("#"):
+        return target
+    path, _, anchor = target.partition("#")
+    rel = Path(os.path.normpath(folder / path)).relative_to(ROOT)
+    if rel.parent == Path("docs") and rel.suffix == ".md":
+        new = page_name(rel)
+    elif rel.suffix.lower() in MEDIA:
+        new = RAW + rel.as_posix()     # images are shown, not linked: the raw file
+    else:
+        new = TREE + rel.as_posix()
+    return f"{new}#{anchor}" if anchor else new
+
+
 def rewrite_links(text: str, folder: Path) -> str:
-    """Rewrites the relative links of a Markdown file that lives in `folder`."""
-    def sub(m: re.Match) -> str:
-        target = m.group(1)
-        if re.match(r"[a-z]+:", target) or target.startswith("#"):
-            return m.group(0)
-        path, _, anchor = target.partition("#")
-        rel = Path(os.path.normpath(folder / path)).relative_to(ROOT)
-        if rel.parent == Path("docs") and rel.suffix == ".md":
-            new = page_name(rel)
-        else:
-            new = TREE + rel.as_posix()
-        return f"]({new}#{anchor})" if anchor else f"]({new})"
-    return LINK.sub(sub, text)
+    """Rewrites the relative links and image sources of a Markdown file that lives in `folder`."""
+    text = LINK.sub(lambda m: f"]({rewrite_target(m.group(1), folder)})", text)
+    return SRC.sub(lambda m: f'src="{rewrite_target(m.group(1), folder)}"', text)
 
 
 def without_title(text: str) -> str:

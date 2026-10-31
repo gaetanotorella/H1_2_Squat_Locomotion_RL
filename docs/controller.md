@@ -8,6 +8,8 @@ It builds on the C++ deploy framework of unitree_rl_lab (`deploy/include/`), whi
 Lab's managers: an observation manager and an action manager configured from the policy's
 `deploy.yaml`, and an ONNX runner.
 
+<p align="center"><img src="media/control_architecture.png" width="560" alt="Architecture of the controller"></p>
+
 ```
 deploy/
 ├── include/                       framework (shared)
@@ -75,6 +77,8 @@ disabled. Every entry into the Squat state starts from 0.98 m.
 
 ## From the robot state to the policy
 
+![Control loop of the policy on the robot](media/control_loop.png)
+
 Every **20 ms** (50 Hz, `step_dt` in `deploy.yaml`), in a dedicated thread:
 
 1. **Robot state** from the latest `rt/lowstate`: joint positions and velocities (reordered from SDK
@@ -100,6 +104,12 @@ The FSM thread sends the latest targets at 1 kHz with the `stiffness` and `dampi
 All the joystick-to-height logic and the cutoff are in
 `deploy/include/isaaclab/envs/mdp/observations/observations.h` (`base_height_command`,
 `squat_speed_scale`, `velocity_commands`, `gait_phase`).
+
+![Joints of the H1_2 in SDK motor order](media/joints.jpg)
+
+*The joints numbered in SDK motor order, the order of `rt/lowstate` and `rt/lowcmd` (the policy uses
+Isaac Lab's order, mapped by `joint_ids_map`). The hands are drawn for completeness: this project
+uses the handless robot, so the wrists are the last joints.*
 
 ## Policy and configuration
 

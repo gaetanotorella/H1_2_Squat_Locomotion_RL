@@ -20,6 +20,12 @@ The custom terms are in `tasks/locomotion/mdp/`. All values below are those of t
 | actor-critic | asymmetric: the critic also sees privileged quantities (true base velocity and height, joint torques) |
 | algorithm | PPO (rsl-rl 5.0.1) |
 
+![Asymmetric actor-critic](media/actor_critic.png)
+
+*The critic (top) is used only in training and sees one frame of privileged, noise-free
+observations; the actor (bottom) is the network exported to ONNX and run on the robot, with 5 frames
+of noisy observations as input.*
+
 ## Robot and actuators
 
 Ideal PD actuators (`IdealPDActuatorCfg`), with the gains of the controller's FixStand state, so
