@@ -7,9 +7,10 @@ docs/ is the source of the documentation; the Wiki is only a copy of it:
     python3 scripts/publish_wiki.py ../wiki
     cd ../wiki && git add -A && git commit -m "Sync with docs/" && git push
 
-Home.md is made from README.md and _Sidebar.md lists the pages in the README order. Links between
-pages become Wiki links; links to the rest of the repository become links to GitHub. Pages of the
-Wiki that no longer exist in docs/ are deleted.
+Home.md is made from README.md, _Sidebar.md lists the pages in the order of the README's
+Documentation section, and _Footer.md tells readers where the pages come from. Links between pages
+become Wiki links; links to the rest of the repository become links to GitHub. Pages of the Wiki
+that no longer exist in docs/ are deleted.
 """
 from __future__ import annotations
 
@@ -22,6 +23,9 @@ ROOT = Path(__file__).resolve().parents[1]
 DOCS = ROOT / "docs"
 TREE = "https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/tree/main/"
 RAW = "https://raw.githubusercontent.com/gaetanotorella/H1_2_Squat_Locomotion_RL/main/"
+WIKI = "https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/"
+FOOTER = (f"*These pages are generated from [`docs/`]({TREE}docs) of the repository by "
+          f"`scripts/publish_wiki.py`: edits made here are overwritten, change `docs/` instead.*\n")
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 SRC = re.compile(r'src="([^"]+)"')
 MEDIA = (".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".mp4")
@@ -34,6 +38,8 @@ def page_name(md: Path) -> str:
 
 def rewrite_target(target: str, folder: Path) -> str:
     """A relative link of a Markdown file in `folder`, as seen from the Wiki."""
+    if target.startswith(WIKI):
+        return target[len(WIKI):]      # the README links the Wiki pages by their full address
     if re.match(r"[a-z]+:", target) or target.startswith("#"):
         return target
     path, _, anchor = target.partition("#")
@@ -70,8 +76,9 @@ def main() -> None:
 
     readme = (ROOT / "README.md").read_text()
     # the numbered list of the README's Documentation section gives the order of the pages
-    order = [Path(p).name for p in re.findall(r"^\d+\. \[[^\]]*\]\((docs/[^)#]+\.md)\)", readme, re.M)]
-    pages = sorted(DOCS.glob("*.md"), key=lambda p: (order.index(p.name) if p.name in order else len(order), p.name))
+    order = re.findall(rf"^\d+\. \[[^\]]*\]\({re.escape(WIKI)}([\w-]+)\)", readme, re.M)
+    pages = sorted(DOCS.glob("*.md"),
+                   key=lambda p: (order.index(page_name(p)) if page_name(p) in order else len(order), p.name))
 
     written = {"Home.md": rewrite_links(readme, ROOT)}
     sidebar = ["**[Home](Home)**", ""]
@@ -81,6 +88,7 @@ def main() -> None:
         written[page_name(md) + ".md"] = rewrite_links(without_title(text), DOCS)
         sidebar.append(f"{i}. [{title}]({page_name(md)})")
     written["_Sidebar.md"] = "\n".join(sidebar) + "\n"
+    written["_Footer.md"] = FOOTER
 
     for old in wiki.glob("*.md"):
         if old.name not in written:

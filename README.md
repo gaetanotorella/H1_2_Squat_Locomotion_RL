@@ -37,23 +37,23 @@ On the physical robot, with the policy trained in simulation and no fine-tuning:
   0.71 m;
 - **push recovery**: 7 pushes out of 7 absorbed while standing, in at most 0.72 s, no falls.
 
-Videos, plots and the comparison with simulation: [Results](docs/results.md).
+Videos, plots and the comparison with simulation: [Results](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Results).
 
 ## Documentation
 
-1. [Installation](docs/installation.md): dependencies and exact versions, build of SDK, simulator and controller, Isaac Lab
-2. [Training](docs/training.md): train, play and export a policy
-3. [Training environment](docs/training_environment.md): commands, observations, actions, rewards, events, curriculum, terminations, PPO
-4. [Controller](docs/controller.md): FSM, gamepad, how observations are built and fed to the policy, timing, safety
-5. [Simulation](docs/simulation.md): sim2sim in MuJoCo with the gamepad
-6. [Evaluation](docs/evaluation.md): automated protocols, metrics, comparison, replay of real experiments
-7. [Real robot](docs/real_robot.md): deployment on the H1_2 with Docker, operating procedure
-8. [Results](docs/results.md): images and videos of the thesis
-9. [Building on this work](docs/building_on_this_work.md): what to reuse, how to extend it, sim-to-real lessons, open problems
+The documentation is in the [Wiki](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki):
+
+1. [Installation](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Installation): dependencies and exact versions, build of SDK, simulator and controller, Isaac Lab
+2. [Training](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Training): train, play and export a policy
+3. [Training environment](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Training-environment): commands, observations, actions, rewards, events, curriculum, terminations, PPO
+4. [Controller](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Controller): FSM, gamepad, how observations are built and fed to the policy, timing, safety
+5. [Simulation](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Simulation): sim2sim in MuJoCo with the gamepad
+6. [Evaluation](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Evaluation): automated protocols, metrics, comparison, replay of real experiments
+7. [Real robot](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Real-robot): deployment on the H1_2 with Docker, operating procedure
+8. [Results](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Results): images and videos of the thesis
+9. [Building on this work](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Building-on-this-work): what to reuse, how to extend it, sim-to-real lessons, open problems
 
 Questions and problems: [GitHub issues](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/issues).
-
-The pages are written in `docs/`; the Wiki is a copy made with `scripts/publish_wiki.py`.
 
 ## Quick start (sim2sim)
 
@@ -69,7 +69,7 @@ deploy/robots/h1_2_squat/build/h1_2_ctrl_squat -n lo    # terminal 2
 ```
 
 Then on the gamepad: `LT + up` (stand up), `RB + X` (start the policy), key `9` in the MuJoCo window
-(release the elastic band). See [Simulation](docs/simulation.md) for all the controls.
+(release the elastic band). See [Simulation](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/wiki/Simulation) for all the controls.
 
 ## Software versions
 
