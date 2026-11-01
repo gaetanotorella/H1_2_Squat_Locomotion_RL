@@ -69,7 +69,8 @@ def main() -> None:
     wiki = Path(sys.argv[1])
 
     readme = (ROOT / "README.md").read_text()
-    order = [Path(p).name for p in re.findall(r"\]\((docs/[^)#]+\.md)\)", readme)]
+    # the numbered list of the README's Documentation section gives the order of the pages
+    order = [Path(p).name for p in re.findall(r"^\d+\. \[[^\]]*\]\((docs/[^)#]+\.md)\)", readme, re.M)]
     pages = sorted(DOCS.glob("*.md"), key=lambda p: (order.index(p.name) if p.name in order else len(order), p.name))
 
     written = {"Home.md": rewrite_links(readme, ROOT)}
