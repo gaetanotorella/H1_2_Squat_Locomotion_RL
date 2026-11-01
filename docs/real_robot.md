@@ -72,9 +72,21 @@ On the Unitree remote:
 
 1. `L2 + up`: FixStand (3 s ramp to the default pose);
 2. `R1 + X`: Squat, the policy starts; the CSV log folder is printed (`[run_logger] ... exp_<ts>`);
-3. drive: left stick vx/vy, right stick wz; `R2` held lowers the height and stops at 0.71 m,
-   `A + R2` goes down to 0.60 m, `B` stands up. The height is printed in the log;
+3. drive: left stick forward/backward and sideways, right stick to turn, and the height with the
+   buttons below. The height is printed in the log;
 4. `L2 + B`: Passive.
+
+Height of the squat on the Unitree remote (an addition of this controller, see
+[Controller § What it adds](controller.md#what-it-adds-to-unitree_rl_lab)):
+
+| hold | effect |
+|---|---|
+| `R2` | go down at 0.05 m/s; **stops at 0.71 m**, the lowest height at which the robot walks |
+| `A + R2` | continue below the stop, down to **0.60 m**; the sticks are ignored below 0.70 m |
+| `B` | stand up at 0.05 m/s, up to **0.98 m** |
+
+The stop at 0.71 m lets the operator reach the lowest walking height without overshooting it; going
+deeper always takes a deliberate second button.
 
 **Shutdown: first `L2 + B` (Passive), then `docker stop h1_2_ctrl`.** The controller does not handle
 SIGTERM: `docker stop` kills it after 10 s, so it must never be stopped while the robot is in RL.

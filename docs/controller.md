@@ -28,6 +28,26 @@ deploy/
 └── scripts/probe_dds.sh           lists the DDS topics seen on the network
 ```
 
+## What it adds to unitree_rl_lab
+
+The locomotion controllers of unitree_rl_lab are driven by velocity commands only. For the squat,
+this controller adds:
+
+- **the height command from the gamepad** ([below](#gamepad-in-the-squat-state)): two buttons to go
+  down, with an automatic stop at **0.71 m**, the lowest height at which the robot still walks, and
+  a second combination to continue down to **0.60 m**; one button to stand up to **0.98 m**;
+- **velocity commands set to zero below `cutoff_height`** (0.70 m), as in training, where the policy
+  was never asked to walk that low;
+- **the gait clock frozen at zero command**, as in training, so that the robot stands still instead
+  of stepping in place;
+- **the reason of every return to Passive** in the log (gamepad or lowstate timeout);
+- the [CSV run log](#csv-run-log), the `--config` option and the Docker image for the robot.
+
+Heights and cutoff are read from `deploy.yaml` (`commands.base_height` and
+`commands.base_velocity.cutoff_height`), so a policy trained with another range works with the same
+buttons. The logic is in `base_height_command`, `velocity_commands` and `gait_phase`
+(`deploy/include/isaaclab/envs/mdp/observations/observations.h`).
+
 ## Command line
 
 ```
@@ -63,13 +83,15 @@ The log tells which one fired (`FSM: Change state from Squat to Passive (joystic
 
 ## Gamepad in the Squat state
 
-| input | effect |
-|---|---|
-| left stick | forward/backward (vx) and lateral (vy) velocity |
-| right stick, horizontal | turn (wz) |
-| `RT` held | lower the height target at 0.05 m/s; it **stops at 0.71 m**, the lowest walking height |
-| `A + RT` held | go further down, to 0.60 m |
-| `B` held | raise the height target at 0.05 m/s, up to 0.98 m |
+| Xbox gamepad (simulation) | Unitree remote (robot) | effect |
+|---|---|---|
+| left stick | left stick | forward/backward (vx) and lateral (vy) velocity |
+| right stick, horizontal | right stick, horizontal | turn (wz) |
+| `RT` held | `R2` held | lower the height target at 0.05 m/s; it **stops at 0.71 m**, the lowest walking height (1 cm above the 0.70 m cutoff) |
+| `A + RT` held | `A + R2` held | go below the stop, down to **0.60 m**; no walking below 0.70 m |
+| `B` held | `B` held | raise the height target at 0.05 m/s, up to **0.98 m** |
+
+The full excursion, 0.98 to 0.60 m, takes 7.6 s.
 
 The commanded height is printed in the terminal (`Squat: height 0.843 m`), with a message when the
 0.71 m stop is reached and a warning when it goes below 0.70 m, where the velocity commands are

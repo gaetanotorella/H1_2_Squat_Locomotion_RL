@@ -28,9 +28,21 @@ Sequence:
 2. `LT + up` on the gamepad: FixStand, the robot moves to the default pose in 3 s;
 3. `RB + X`: the policy starts;
 4. key `9` in the MuJoCo window: releases the band, the robot stands on its own;
-5. drive it: sticks for velocity, `RT` / `A + RT` / `B` for the height (see
-   [Controller § Gamepad](controller.md#gamepad-in-the-squat-state));
+5. drive it: left stick forward/backward and sideways, right stick to turn, and the height with
+   the buttons below;
 6. `LT + B`: back to Passive.
+
+Height of the squat (an addition of this controller, see
+[Controller § What it adds](controller.md#what-it-adds-to-unitree_rl_lab)):
+
+| hold | effect |
+|---|---|
+| `RT` | go down at 0.05 m/s; **stops at 0.71 m**, the lowest height at which the robot walks |
+| `A + RT` | continue below the stop, down to **0.60 m**; the sticks are ignored below 0.70 m |
+| `B` | stand up at 0.05 m/s, up to **0.98 m** |
+
+The height is printed in the controller's terminal. To walk crouched, hold `RT` until the stop and
+then use the sticks.
 
 ## Keys in the MuJoCo window
 

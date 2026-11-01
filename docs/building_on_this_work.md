@@ -11,9 +11,29 @@ sim-to-real lessons that cost the most time, and the open problems. Questions ar
 |---|---|
 | `assets/h1_2/` | handless H1_2 for Isaac Lab (URDF) and MuJoCo (MJCF), same meshes; joint order, axes and limits checked between the two |
 | H1_2 configuration in `training/` | actuator gains, armature, domain randomization (including the centre of mass) and an asymmetric actor-critic setup that transferred to the real robot |
-| `deploy/` controller | FSM, DDS, safety checks and the Docker image for the robot. It is **data-driven**: joints, gains, observations and commands come from the policy's `deploy.yaml`, so a new policy that uses observation terms the controller already knows runs without touching C++ |
+| `deploy/` controller | FSM, DDS, safety checks and the Docker image for the robot, extended with the height command from the gamepad (below). It is **data-driven**: joints, gains, observations and commands come from the policy's `deploy.yaml`, so a new policy that uses observation terms the controller already knows runs without touching C++ |
 | `simulator/` | the robot's DDS interface in MuJoCo: sim-to-sim with the same controller binary used on the robot |
 | `evaluation/` | fixed protocols for comparing policies, and replay of real experiments in simulation with the same commands |
+
+### What the controller adds to unitree_rl_lab
+
+The C++ deploy framework comes from unitree_rl_lab, whose locomotion controllers are driven by
+velocity commands only. This one adds what the squat needs, all configured from `deploy.yaml`:
+
+| addition | what it does |
+|---|---|
+| **height command from the gamepad** | `RT` (`R2` on the Unitree remote) held lowers the height target at 0.05 m/s and **stops automatically at 0.71 m**, 1 cm above the 0.70 m limit below which the robot no longer walks; `A + RT` held goes further down, to **0.60 m**; `B` held raises it at 0.05 m/s up to **0.98 m**. Every entry into the Squat state starts from 0.98 m, and the height is printed in the terminal, with a message at the stop and a warning below 0.70 m |
+| **velocity commands as in training** | below `cutoff_height` (0.70 m), where the policy was never asked to walk, the stick commands are set to zero |
+| **gait clock as in training** | the clock observation is (0, 0) when the command is zero, so the robot stands still instead of stepping in place |
+| **reason of every return to Passive** | the log says whether it came from the gamepad or from the lowstate timeout (a communication problem) |
+| **CSV run log, `--config`, Docker image** | see [Controller](controller.md) and [Real robot](real_robot.md) |
+
+The stop, the deepest height and the cutoff are not hard-coded: they come from `base_height` and
+`cutoff_height` in `deploy.yaml`, which training exports from `DEEPEST_SQUAT` and the cutoff in
+`squat_env_cfg.py`. A policy trained with another range uses the same buttons with its own limits.
+The logic is in `base_height_command` and `velocity_commands`, in
+`deploy/include/isaaclab/envs/mdp/observations/observations.h`: a new command driven by the gamepad
+goes there too.
 
 ## Common extensions
 
@@ -183,7 +203,9 @@ object (< 0.3 kg, table at 0.70–0.80 m, one arm), walk away, squat and stand u
 - **Hands.** The model with the dexterous hands is `h1_2_with_FTP_hand.urdf` in
   [unitree_ros](https://github.com/unitreerobotics/unitree_ros) (`robots/h1_2_description/`). Each
   hand weighs 3.28 kg, and the hands come with 6 kg of electronics on the torso: 79.5 kg against
-  67.0 kg handless. The CoM barely moves (−2.46 → −2.08 cm). If the fingers do not move during the
+  67.0 kg handless. The CoM barely moves (−2.46 → −2.08 cm). The final policy was trained and
+  tested on the robot without hands: with the hands the mass is about 19% higher, beyond what was
+  validated. If the fingers do not move during the
   task, keep 27 joints and merge each hand into its wrist link as a rigid body (mass, CoM and inertia
   describe it exactly), instead of the 51-joint model. Each hand has 17 force sensors: grasp
   detection can be tactile, immune to occlusion.
@@ -198,16 +220,3 @@ object (< 0.3 kg, table at 0.70–0.80 m, one arm), walk away, squat and stand u
   gives the true object pose to compare with: a check that does not exist on the real robot.
 - No public repository covers the H1_2 with these hands: check the topics and their meaning on the
   robot before writing the controller side.
-
-## Outside the PRISMA Lab
-
-- **Hardware.** An H1_2 and a PC with an NVIDIA RTX GPU for training ([Installation](installation.md)).
-  The policy was trained and tested on the robot **without hands**: with the hands mounted the mass
-  is about 19% higher, beyond what was validated.
-- **Safety.** Read [Real robot](real_robot.md) before the first run: debug mode, crane, shutdown
-  order.
-- **License and citation.** Apache-2.0, with the third-party parts listed in
-  `THIRD_PARTY_NOTICES.md`; if this work helps yours, please cite the thesis (see the README).
-- **PRISMA Lab members.** On the lab workstation Isaac Lab runs in Docker through the lab's
-  `isaaclab` command: follow the
-  [lab guide](https://prismahubunofficial.github.io/docs_and_guides/robots/server/isaac_sim_lab/).
