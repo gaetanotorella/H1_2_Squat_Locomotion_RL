@@ -49,6 +49,9 @@ Videos, plots and the comparison with simulation: [Results](docs/results.md).
 6. [Evaluation](docs/evaluation.md): automated protocols, metrics, comparison, replay of real experiments
 7. [Real robot](docs/real_robot.md): deployment on the H1_2 with Docker, operating procedure
 8. [Results](docs/results.md): images and videos of the thesis
+9. [Building on this work](docs/building_on_this_work.md): what to reuse, how to extend it, sim-to-real lessons, open problems
+
+Questions and problems: [GitHub issues](https://github.com/gaetanotorella/H1_2_Squat_Locomotion_RL/issues).
 
 The pages are written in `docs/`; the Wiki is a copy made with `scripts/publish_wiki.py`.
 
